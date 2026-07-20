@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace ProOceanVan\Service;
 
+use ProOceanVan\Portal\OperationsPortal;
 use ProOceanVan\Repository\RequestRepository;
+use ProOceanVan\Security\Capabilities;
 
 final class PrivacyService
 {
@@ -16,7 +18,7 @@ final class PrivacyService
 
     public function exportRequest(): void
     {
-        if (! current_user_can(apply_filters('pov_manage_capability', 'manage_options'))) {
+        if (! current_user_can(Capabilities::MANAGE_PRIVACY)) {
             wp_die('Keine Berechtigung.');
         }
         check_admin_referer('pov_export_request');
@@ -34,13 +36,13 @@ final class PrivacyService
 
     public function anonymizeRequest(): void
     {
-        if (! current_user_can(apply_filters('pov_manage_capability', 'manage_options'))) {
+        if (! current_user_can(Capabilities::MANAGE_PRIVACY)) {
             wp_die('Keine Berechtigung.');
         }
         check_admin_referer('pov_anonymize_request');
         $id = (int) ($_POST['request_id'] ?? 0);
         (new RequestRepository())->anonymize($id);
-        wp_safe_redirect(admin_url('admin.php?page=pov-requests&request_id=' . $id . '&pov_notice=anonymized'));
+        wp_safe_redirect(OperationsPortal::url('pov-requests', ['request_id' => $id, 'pov_notice' => 'anonymized']));
         exit;
     }
 }

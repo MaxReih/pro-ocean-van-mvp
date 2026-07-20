@@ -186,17 +186,22 @@ final class PublicRecommendationService
         });
         $weekSuggestions = $this->weekSuggestions($suggestions);
         $suggestions = array_slice($suggestions, 0, 2);
+        $publicSuggestions = array_map(static fn (array $suggestion): array => [
+            'date' => (string) $suggestion['date'],
+            'label' => (string) $suggestion['label'],
+        ], $suggestions);
+        $publicWeeks = array_map(static fn (array $week): array => [
+            'date_from' => (string) $week['date_from'],
+            'date_to' => (string) $week['date_to'],
+            'label' => (string) $week['label'],
+            'available_days' => array_values(array_map('strval', (array) $week['available_days'])),
+        ], $weekSuggestions);
 
         return [
             'ok' => true,
             'message' => $suggestions ? 'Diese Tage passen gut zu unserer Route' : 'Kein passender Routentermin gefunden.',
-            'suggestions' => $suggestions,
-            'week_suggestions' => $weekSuggestions,
-            'route_context' => [
-                'latitude' => (float) $geo['latitude'],
-                'longitude' => (float) $geo['longitude'],
-                'postal_code' => $postalCode,
-            ],
+            'suggestions' => $publicSuggestions,
+            'week_suggestions' => $publicWeeks,
             'fallback' => ! $suggestions,
         ];
     }

@@ -1,0 +1,13 @@
+body.login { color: #003852; background: linear-gradient(155deg, #fff 0%, #eef7fb 65%, #e7f4ee 100%); }
+body.login h1 a {
+  width: 92px;
+  height: 72px;
+  background-image: url("../brand/pro-ocean-symbol-blue.svg");
+  background-size: contain;
+  background-position: center;
+}
+body.login #loginform { border: 1px solid #b8cbd6; border-radius: 14px; box-shadow: 0 18px 50px rgba(0, 59, 89, .1); }
+body.login .button-primary { background: #135476; border-color: #135476; }
+body.login .button-primary:hover,
+body.login .button-primary:focus { background: #003852; border-color: #003852; }
+body.login a { color: #135476; }

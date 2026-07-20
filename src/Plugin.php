@@ -7,6 +7,7 @@ namespace ProOceanVan;
 use ProOceanVan\Admin\Menu;
 use ProOceanVan\Frontend\Assets;
 use ProOceanVan\Frontend\Shortcode;
+use ProOceanVan\Portal\OperationsPortal;
 use ProOceanVan\Rest\AdminController;
 use ProOceanVan\Rest\PublicCalendarController;
 use ProOceanVan\Rest\RecommendationController;
@@ -40,10 +41,10 @@ final class Plugin
         Activation::maybeUpgrade();
         Activation::applyTestProfileIfUnconfigured();
 
-        add_filter('pov_manage_capability', static fn (): string => 'manage_options');
         (new Assets())->register();
         (new Shortcode())->register();
         (new Menu())->register();
+        (new OperationsPortal())->register();
         (new PrivacyService())->register();
         (new PublicSuggestionResponseService())->register();
 

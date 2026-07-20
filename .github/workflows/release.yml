@@ -1,0 +1,33 @@
+name: Plugin-Release veröffentlichen
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v6
+
+      - name: Plugin-Archiv bauen
+        shell: bash
+        run: |
+          mkdir -p build/pro-ocean-van
+          cp -R pro-ocean-van.php uninstall.php readme.txt src templates assets build/pro-ocean-van/
+          cd build
+          zip -r ../pro-ocean-van.zip pro-ocean-van
+
+      - name: GitHub-Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${GITHUB_REF_NAME}" pro-ocean-van.zip \
+            --title "Pro Ocean Van Planner ${GITHUB_REF_NAME}" \
+            --generate-notes

@@ -23,15 +23,27 @@ Der einmalige WordPress-Start kann je nach Gerät und Verbindung etwas dauern; d
 - Serverseitige Adressgeokodierung; Koordinaten und Kosten aus dem Browser werden nicht übernommen
 - Kostenoptimierte Wochenrouten über OSRM-Distanzmatrizen, Nearest Neighbour und 2-opt
 - Terminvorschläge aus Routenoptimierung, Wochenfüllung und regionaler Bündelung nach Bundesland
-- Operations-Cockpit für Anfrage-Workflow, Kalender, Vorschlagsmail, Bestätigung und Datenschutz
+- Login-geschütztes Van-Operations-Portal für Anfrage-Workflow, Tourplanung, Kalender und Statistik
+- Persönliche Rollen „Ocean Van Team“ und „Ocean Van Lesend“ mit getrennten Berechtigungen
 - ICS-Download und vorausgefüllter Google-Kalender-Link für bestätigte Termine
 
 ## Installation
 
 1. Ordner `pro-ocean-van` nach `wp-content/plugins/` kopieren.
 2. Plugin `Pro Ocean Van Planner` in WordPress aktivieren.
-3. Unter `Ocean Van > Einstellungen` mindestens aktive Bundesländer, Kilometersatz und Grenzwerte pflegen.
-4. Shortcode `[pro_ocean_van_booking]` auf einer Seite einfügen.
+3. Unter `Ocean Van` mindestens aktive Bundesländer, Kilometersatz und Grenzwerte pflegen.
+4. Unter `Benutzer` die Rolle `Ocean Van Team` oder `Ocean Van Lesend` zuweisen.
+5. Das Team arbeitet unter `/van-operations/`; technische Einstellungen bleiben in WordPress.
+6. Shortcode `[pro_ocean_van_booking]` auf einer Seite einfügen.
+
+## Hybrides Betriebsmodell
+
+- `/van-operations/`: Anfragen, Tourplanung, Kalender und Statistik
+- WordPress-Backend: Benutzer, Rollen und technische Konfiguration
+- `Ocean Van Team`: operative Bearbeitung und Kalenderexport
+- `Ocean Van Lesend`: Touren, Kalender und Statistik ohne Kontakt- oder Exportdaten
+
+Das Portal nutzt die persönlichen WordPress-Logins. Es wird weder öffentlich gecacht noch von Suchmaschinen indexiert.
 
 ## Entwicklung
 
@@ -54,7 +66,7 @@ Für die lokale Testversion aktiviert das Plugin bei fehlender Konfiguration aut
 
 Das ist für Tests voll funktionsfähig, aber nicht als Produktivbetrieb gedacht. Für echte Nutzung eigene Nominatim- und OSRM-kompatible Dienste eintragen.
 
-Die Basis-URLs werden in `Ocean Van > Einstellungen` gepflegt. Dort kann das OSM-Testprofil auch erneut aktiviert werden.
+Die Basis-URLs werden im WordPress-Menü `Ocean Van` gepflegt. Dort kann das OSM-Testprofil auch erneut aktiviert werden.
 
 ## Mailpit
 

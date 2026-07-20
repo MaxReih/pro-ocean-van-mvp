@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ProOceanVan\Service;
 
+use ProOceanVan\Portal\OperationsPortal;
 use ProOceanVan\Repository\RequestRepository;
 
 final class MailService
@@ -58,7 +59,7 @@ final class MailService
             'Route: ' . $route,
             'Gruppe: ' . (string) $request['participant_count'],
             '',
-            admin_url('admin.php?page=pov-requests&request_id=' . $requestId),
+            OperationsPortal::url('pov-requests', ['request_id' => $requestId]),
         ]);
 
         $allSent = true;

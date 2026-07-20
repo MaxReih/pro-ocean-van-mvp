@@ -95,7 +95,7 @@
             delete configured.login;
           }
           configured.landingPage = isBackend
-            ? '/wp-admin/admin.php?page=pov-requests'
+            ? '/van-operations/'
             : '/';
           const json = JSON.stringify(configured);
           const bytes = new TextEncoder().encode(json);

@@ -72,9 +72,13 @@ for (const cookie of cookies) {
   await command('Network.setCookie', { ...cookie, url: 'http://proocean.local/', path: '/', httpOnly: true, sameSite: 'Lax' });
 }
 
-await navigate('http://proocean.local/wp-admin/admin.php?page=pov-routes');
+await navigate('http://proocean.local/van-operations/?view=routes');
 const routeAudit = await evaluate(`(() => ({
   nav: [...document.querySelectorAll('.pov-admin-header nav a')].map((node) => node.textContent.trim()),
+  path: location.pathname,
+  view: new URL(location.href).searchParams.get('view'),
+  robots: document.querySelector('meta[name=robots]')?.content,
+  personalSession: Boolean(document.querySelector('.pov-admin-usernav span') && document.querySelector('.pov-admin-usernav a[href*=logout]')),
   clusters: document.querySelectorAll('.pov-route-cluster').length,
   routeLegs: document.querySelectorAll('.pov-tour-leg').length,
   datedStops: [...document.querySelectorAll('.pov-tour-stop time')].map((node) => node.textContent.trim()),
@@ -100,7 +104,14 @@ if (routeAudit.issueHrefs.length) {
   await screenshot('final-admin-address-edit.png');
 }
 
-await navigate('http://proocean.local/wp-admin/admin.php?page=pov-statistics&period=week');
+await navigate('http://proocean.local/wp-admin/admin.php?page=pov-routes');
+const legacyAdminAudit = await evaluate(`(() => ({
+  path: location.pathname,
+  view: new URL(location.href).searchParams.get('view'),
+  inPortal: location.pathname.replace(/\\/+$/, '') === '/van-operations',
+}))()`);
+
+await navigate('http://proocean.local/van-operations/?view=statistics&period=week');
 const statisticsAudit = await evaluate(`(() => ({
   periods: [...document.querySelectorAll('.pov-period-switch a')].map((node) => node.textContent.trim()),
   rows: document.querySelectorAll('.pov-compact-table tbody tr').length,
@@ -109,7 +120,7 @@ const statisticsAudit = await evaluate(`(() => ({
 }))()`);
 await screenshot('final-admin-statistics.png');
 
-await navigate('http://proocean.local/wp-admin/admin.php?page=pov-calendar&pov_month=2026-07');
+await navigate('http://proocean.local/van-operations/?view=calendar&pov_month=2026-07');
 const calendarAudit = await evaluate(`(() => {
   const panel = document.querySelector('[data-pov-calendar-export]');
   const select = document.querySelector('[data-pov-calendar-export-select]');
@@ -135,25 +146,42 @@ calendarAudit.daySelection = await evaluate(`(() => {
   return select.selectedOptions[0]?.dataset.date === day.dataset.date;
 })()`);
 
-await navigate('http://proocean.local/wp-admin/admin.php?page=pov-requests');
+await navigate('http://proocean.local/van-operations/');
 const inboxAudit = await evaluate(`(() => ({
   rows: document.querySelectorAll('.pov-operations-table tbody tr').length,
   nav: [...document.querySelectorAll('.pov-admin-header nav a')].map((node) => node.textContent.trim()),
+  detailHref: document.querySelector('.pov-operations-table a.pov-open-button')?.href || '',
 }))()`);
 await screenshot('final-admin-requests.png');
 
-await navigate('http://proocean.local/wp-admin/admin.php?page=pov-requests&request_id=5');
-const detailAudit = await evaluate(`(() => ({
-  suggestions: document.querySelectorAll('.pov-admin-suggestion').length,
-  responses: [...document.querySelectorAll('[name=response_type]')].map((node) => node.value),
-  maps: document.querySelectorAll('[class*=map], .leaflet-container').length,
-  location: document.querySelector('.pov-request-hero p')?.textContent.trim(),
-  message: document.querySelector('[name=message]')?.value,
+let detailAudit = { available: false };
+if (inboxAudit.detailHref) {
+  await navigate(inboxAudit.detailHref);
+  detailAudit = await evaluate(`(() => ({
+    available: true,
+    requestId: new URL(location.href).searchParams.get('request_id'),
+    suggestions: document.querySelectorAll('.pov-admin-suggestion').length,
+    responses: [...document.querySelectorAll('[name=response_type]')].map((node) => node.value),
+    maps: document.querySelectorAll('[class*=map], .leaflet-container').length,
+    location: document.querySelector('.pov-request-hero p')?.textContent.trim(),
+    message: document.querySelector('[name=message]')?.value,
+  }))()`);
+  await evaluate(`(() => { const choice=document.querySelector('[name=response_type][value=question]'); if(choice){choice.click();} return true; })()`);
+  detailAudit.questionTemplate = await evaluate('document.querySelector("[name=message]")?.value');
+  detailAudit.dateHiddenOnQuestion = await evaluate('document.querySelector("[data-pov-response-date]")?.hidden && getComputedStyle(document.querySelector("[data-pov-response-date]")).display === "none"');
+  await screenshot('final-admin-request-detail.png');
+}
+
+await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+await navigate('http://proocean.local/van-operations/');
+const mobileAudit = await evaluate(`(() => ({
+  viewport: window.innerWidth,
+  pageOverflow: document.documentElement.scrollWidth > window.innerWidth,
+  navOverflow: document.querySelector('.pov-admin-header nav')?.scrollWidth > document.querySelector('.pov-admin-header nav')?.clientWidth,
+  nav: [...document.querySelectorAll('.pov-admin-header nav a')].map((node) => node.textContent.trim()),
 }))()`);
-await evaluate(`(() => { const choice=document.querySelector('[name=response_type][value=question]'); if(choice){choice.click();} return true; })()`);
-detailAudit.questionTemplate = await evaluate('document.querySelector("[name=message]")?.value');
-detailAudit.dateHiddenOnQuestion = await evaluate('document.querySelector("[data-pov-response-date]")?.hidden && getComputedStyle(document.querySelector("[data-pov-response-date]")).display === "none"');
-await screenshot('final-admin-request-detail.png');
+await screenshot('final-portal-mobile.png');
+await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
 
 await navigate('http://proocean.local/wp-admin/admin.php?page=pov-settings');
 await evaluate(`(() => {
@@ -163,6 +191,9 @@ await evaluate(`(() => {
   return Boolean(routing);
 })()`);
 const settingsAudit = await evaluate(`(() => ({
+  path: location.pathname,
+  page: new URL(location.href).searchParams.get('page'),
+  oceanVanAdminLinks: [...document.querySelectorAll('#adminmenu a[href*="page=pov-"]')].map((node) => new URL(node.href).searchParams.get('page')),
   personnelFields: ['pov_personnel_hourly_rate','pov_personnel_count','pov_default_visit_hours'].every((name) => Boolean(document.querySelector('[name="' + name + '"]'))),
   responseTemplates: document.querySelectorAll('[name^=pov_response_][name$=_template]').length,
   geoTest: [...document.querySelectorAll('a.button')].some((node) => node.textContent.includes('Verbindung testen')),
@@ -173,6 +204,14 @@ const settingsAudit = await evaluate(`(() => ({
 await screenshot('final-admin-settings-geo.png');
 
 await command('Network.clearBrowserCookies');
+await command('Page.navigate', { url: 'http://proocean.local/van-operations/?view=calendar' });
+await waitFor('document.readyState === "complete"');
+await waitFor('location.pathname.includes("wp-login.php") || Boolean(document.querySelector("#loginform"))');
+const guestAudit = await evaluate(`(() => ({
+  path: location.pathname,
+  loginForm: Boolean(document.querySelector('#loginform')),
+  redirectedFromPortal: new URL(location.href).searchParams.get('redirect_to')?.includes('/van-operations/') || false,
+}))()`);
 await command('Browser.close').catch(() => {});
 socket.close();
-process.stdout.write(JSON.stringify({ routeAudit, addressAudit, statisticsAudit, calendarAudit, inboxAudit, detailAudit, settingsAudit, errors }, null, 2) + '\n');
+process.stdout.write(JSON.stringify({ routeAudit, legacyAdminAudit, addressAudit, statisticsAudit, calendarAudit, inboxAudit, detailAudit, mobileAudit, settingsAudit, guestAudit, errors }, null, 2) + '\n');

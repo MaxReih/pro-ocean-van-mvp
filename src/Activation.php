@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace ProOceanVan;
 
 use ProOceanVan\Database\Schema;
+use ProOceanVan\Portal\OperationsPortal;
+use ProOceanVan\Security\Capabilities;
 
 final class Activation
 {
@@ -13,6 +15,13 @@ final class Activation
         self::installTables();
         self::seedStates();
         self::seedOptions();
+        Capabilities::syncRoles();
+        update_option('pov_capability_setup_version', '1', false);
+        if (did_action('init')) {
+            OperationsPortal::ensurePage();
+        } else {
+            add_action('init', [OperationsPortal::class, 'ensurePage'], 5);
+        }
 
         if (! wp_next_scheduled('pov_cleanup_route_cache')) {
             wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'pov_cleanup_route_cache');
@@ -22,6 +31,10 @@ final class Activation
     public static function maybeUpgrade(): void
     {
         self::seedOptions();
+        if ((string) get_option('pov_capability_setup_version', '') !== '1') {
+            Capabilities::syncRoles();
+            update_option('pov_capability_setup_version', '1', false);
+        }
         if ((string) get_option('pov_schema_version', '') === Schema::VERSION) {
             return;
         }

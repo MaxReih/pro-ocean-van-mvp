@@ -11,12 +11,14 @@ use ProOceanVan\Activation;
 use ProOceanVan\Domain\RequestStatus;
 use ProOceanVan\Domain\SuggestionState;
 use ProOceanVan\Domain\WorkState;
+use ProOceanVan\Portal\OperationsPortal;
 use ProOceanVan\Repository\AppointmentRepository;
 use ProOceanVan\Repository\CalendarDayRepository;
 use ProOceanVan\Repository\RequestRepository;
 use ProOceanVan\Repository\StateRepository;
 use ProOceanVan\Repository\SuggestionRepository;
 use ProOceanVan\Routing\ProviderFactory;
+use ProOceanVan\Security\Capabilities;
 use ProOceanVan\Service\IcsService;
 use ProOceanVan\Service\GermanDateFormatter;
 use ProOceanVan\Service\InternalSuggestionService;
@@ -27,10 +29,15 @@ use ProOceanVan\Service\WeeklyClusterService;
 
 final class Menu
 {
+    public function __construct(private readonly bool $portal = false)
+    {
+    }
+
     public function register(): void
     {
         add_action('admin_menu', [$this, 'menus']);
         add_action('admin_enqueue_scripts', [$this, 'assets']);
+        add_action('admin_page_access_denied', [$this, 'redirectLegacyAdmin']);
         add_action('admin_post_pov_save_settings', [$this, 'saveSettings']);
         add_action('admin_post_pov_enable_test_profile', [$this, 'enableTestProfile']);
         add_action('admin_post_pov_test_geo', [$this, 'testGeoConnection']);
@@ -50,13 +57,7 @@ final class Menu
 
     public function menus(): void
     {
-        $cap = $this->capability();
-        add_menu_page('Ocean Van', 'Ocean Van', $cap, 'pov-requests', [$this, 'requests'], 'dashicons-location-alt', 30);
-        add_submenu_page('pov-requests', 'Anfragen', 'Anfragen', $cap, 'pov-requests', [$this, 'requests']);
-        add_submenu_page('pov-requests', 'Tourplanung', 'Tourplanung', $cap, 'pov-routes', [$this, 'routes']);
-        add_submenu_page('pov-requests', 'Statistik', 'Statistik', $cap, 'pov-statistics', [$this, 'statistics']);
-        add_submenu_page('pov-requests', 'Kalender', 'Kalender', $cap, 'pov-calendar', [$this, 'calendar']);
-        add_submenu_page('pov-requests', 'Einstellungen', 'Einstellungen', $cap, 'pov-settings', [$this, 'settings']);
+        add_menu_page('Ocean Van Einstellungen', 'Ocean Van', 'manage_options', 'pov-settings', [$this, 'settings'], 'dashicons-location-alt', 30);
     }
 
     public function assets(string $hook): void
@@ -67,8 +68,23 @@ final class Menu
         }
     }
 
+    public function redirectLegacyAdmin(): void
+    {
+        $page = sanitize_key((string) ($_GET['page'] ?? ''));
+        if ($page === 'pov-settings' && current_user_can(Capabilities::ACCESS_PORTAL) && ! current_user_can('manage_options')) {
+            wp_safe_redirect(OperationsPortal::landingUrl());
+            exit;
+        }
+        if (in_array($page, ['pov-requests', 'pov-routes', 'pov-statistics', 'pov-calendar'], true)
+            && current_user_can(Capabilities::viewForPage($page))) {
+            wp_safe_redirect(OperationsPortal::url($page));
+            exit;
+        }
+    }
+
     public function requests(): void
     {
+        $this->requireCapability(Capabilities::VIEW_REQUESTS);
         $detailId = (int) ($_GET['request_id'] ?? 0);
         if ($detailId > 0) {
             $this->requestDetail($detailId);
@@ -85,12 +101,12 @@ final class Menu
         $items = (new RequestRepository())->list(array_filter($filters), 100);
         $this->header('Anfragen');
         $this->setupNotice();
-        echo '<div class="pov-admin-list-head"><strong>' . esc_html((string) count($items)) . ' Anfragen</strong><a class="button" href="' . esc_url(admin_url('admin.php?page=pov-routes')) . '">Tourplanung</a></div>';
-        echo '<form class="pov-admin-filters" method="get"><input type="hidden" name="page" value="pov-requests">';
+        echo '<div class="pov-admin-list-head"><strong>' . esc_html((string) count($items)) . ' Anfragen</strong><a class="button" href="' . esc_url($this->pageUrl('pov-routes')) . '">Tourplanung</a></div>';
+        echo '<form class="pov-admin-filters" method="get" action="' . esc_url($this->pageUrl('pov-requests')) . '">' . $this->navigationField('pov-requests');
         echo '<label><span>Suche</span><input name="s" value="' . esc_attr($filters['s']) . '" placeholder="Name, Ort, PLZ oder Kennung"></label>';
         echo '<label><span>Arbeitsstand</span><select name="work_state"><option value="">Alle</option>' . $this->options(WorkState::labels(), $filters['work_state']) . '</select></label>';
         echo '<label><span>Terminwunsch</span><select name="request_mode"><option value="">Alle</option>' . $this->options(['specific_date' => 'Fester Tag', 'date_range' => 'Zeitraum'], $filters['request_mode']) . '</select></label>';
-        echo '<button class="button button-primary">Filtern</button><a class="button" href="' . esc_url(admin_url('admin.php?page=pov-requests')) . '">Alle</a></form>';
+        echo '<button class="button button-primary">Filtern</button><a class="button" href="' . esc_url($this->pageUrl('pov-requests')) . '">Alle</a></form>';
         echo '<section class="pov-admin-panel pov-request-list-panel">';
         $this->requestTable($items);
         echo '</section>';
@@ -118,35 +134,46 @@ final class Menu
 
         $this->header('Anfrage ' . $request['public_uuid']);
         $this->setupNotice();
-        echo '<a class="pov-admin-back" href="' . esc_url(admin_url('admin.php?page=pov-requests')) . '">← Zurück zu Anfragen</a>';
+        echo '<a class="pov-admin-back" href="' . esc_url($this->pageUrl('pov-requests')) . '">← Zurück zu Anfragen</a>';
         echo '<section class="pov-request-hero"><div><span class="pov-admin-eyebrow">' . esc_html($request['public_uuid']) . '</span><h2>' . esc_html($request['institution_name']) . '</h2><p>' . esc_html($request['postal_code'] . ' ' . $request['city']) . ' · ' . esc_html($this->requestDateLabel($request)) . '</p></div>';
         echo '<div class="pov-request-hero-meta"><div><span>Status</span><strong>' . esc_html($workLabel) . '</strong></div><div><span>Gruppe</span><strong>' . esc_html((string) $request['participant_count']) . '</strong></div></div></section>';
 
         echo '<div class="pov-admin-workspace"><main>';
-        echo '<section class="pov-admin-panel pov-route-decision"><div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Route</span><h2>Die besten Termine</h2></div><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
-        wp_nonce_field('pov_recalculate_suggestions');
-        echo '<input type="hidden" name="action" value="pov_recalculate_suggestions"><input type="hidden" name="request_id" value="' . esc_attr((string) $id) . '"><button class="button">Neu berechnen</button></form></div>';
+        echo '<section class="pov-admin-panel pov-route-decision"><div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Route</span><h2>Die besten Termine</h2></div>';
+        if (current_user_can(Capabilities::MANAGE_TOURS)) {
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+            wp_nonce_field('pov_recalculate_suggestions');
+            echo '<input type="hidden" name="action" value="pov_recalculate_suggestions"><input type="hidden" name="request_id" value="' . esc_attr((string) $id) . '"><button class="button">Neu berechnen</button></form>';
+        }
+        echo '</div>';
         echo '<div class="pov-route-summary"><div><span>Hin &amp; zurück</span><strong>' . esc_html($distance) . '</strong></div><div><span>Fahrtkosten</span><strong>' . esc_html($cost) . '</strong></div><div><span>Ziel</span><strong>' . esc_html($request['postal_code'] . ' ' . $request['city']) . '</strong></div></div>';
         $this->renderSuggestionCards($bestSuggestions, false);
         echo '</section>';
 
-        echo '<section class="pov-admin-panel pov-response-panel"><div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Kommunikation</span><h2>Antwort senden</h2></div></div>' . $this->responseForm($request, $bestSuggestions) . '</section>';
+        if (current_user_can(Capabilities::SEND_RESPONSES)) {
+            echo '<section class="pov-admin-panel pov-response-panel"><div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Kommunikation</span><h2>Antwort senden</h2></div></div>' . $this->responseForm($request, $bestSuggestions) . '</section>';
+        }
         echo '</main><aside>';
 
         echo $this->addressPanel($request);
 
         echo '<section class="pov-admin-panel"><span class="pov-admin-eyebrow">Vor Ort</span><h2>' . esc_html((string) $request['institution_type']) . '</h2><dl class="pov-request-facts"><div><dt>Teilnehmende</dt><dd>' . esc_html((string) $request['participant_count']) . '</dd></div><div><dt>Zielgruppe</dt><dd>' . esc_html((string) (($request['group_notes'] ?? '') ?: '–')) . '</dd></div></dl>' . $this->warnings($request) . '</section>';
 
-        echo '<section class="pov-admin-panel"><span class="pov-admin-eyebrow">Nur fürs Team</span><h2>Interne Notiz</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
-        wp_nonce_field('pov_save_note');
-        echo '<input type="hidden" name="action" value="pov_save_note"><input type="hidden" name="request_id" value="' . esc_attr((string) $id) . '"><textarea name="internal_note" placeholder="Absprachen, Rückfragen, Besonderheiten …">' . esc_textarea((string) ($request['internal_note'] ?? '')) . '</textarea><button class="button">Notiz speichern</button></form></section>';
-        echo '<details class="pov-admin-panel pov-privacy-panel"><summary>Daten verwalten</summary>' . $this->privacyActions($id) . '</details>';
+        if (current_user_can(Capabilities::MANAGE_REQUESTS)) {
+            echo '<section class="pov-admin-panel"><span class="pov-admin-eyebrow">Nur fürs Team</span><h2>Interne Notiz</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
+            wp_nonce_field('pov_save_note');
+            echo '<input type="hidden" name="action" value="pov_save_note"><input type="hidden" name="request_id" value="' . esc_attr((string) $id) . '"><textarea name="internal_note" placeholder="Absprachen, Rückfragen, Besonderheiten …">' . esc_textarea((string) ($request['internal_note'] ?? '')) . '</textarea><button class="button">Notiz speichern</button></form></section>';
+        }
+        if (current_user_can(Capabilities::MANAGE_PRIVACY)) {
+            echo '<details class="pov-admin-panel pov-privacy-panel"><summary>Daten verwalten</summary>' . $this->privacyActions($id) . '</details>';
+        }
         echo '</aside></div>';
         $this->footer();
     }
 
     public function calendar(): void
     {
+        $this->requireCapability(Capabilities::VIEW_CALENDAR);
         $month = sanitize_text_field((string) ($_GET['pov_month'] ?? date('Y-m')));
         if (! preg_match('/^\d{4}-\d{2}$/', $month)) {
             $month = date('Y-m');
@@ -163,44 +190,55 @@ final class Menu
         $this->setupNotice();
         echo '<div class="pov-calendar-layout">';
         echo '<section class="pov-admin-panel"><div class="pov-admin-calendar-head">';
-        echo '<a class="button" href="' . esc_url(add_query_arg(['page' => 'pov-calendar', 'pov_month' => $monthStart->modify('-1 month')->format('Y-m')], admin_url('admin.php'))) . '">‹</a>';
+        echo '<a class="button" href="' . esc_url($this->pageUrl('pov-calendar', ['pov_month' => $monthStart->modify('-1 month')->format('Y-m')])) . '">‹</a>';
         echo '<h2>' . esc_html(GermanDateFormatter::monthYear($monthStart->format('Y-m-d'))) . '</h2>';
-        echo '<a class="button" href="' . esc_url(add_query_arg(['page' => 'pov-calendar', 'pov_month' => $monthStart->modify('+1 month')->format('Y-m')], admin_url('admin.php'))) . '">›</a>';
+        echo '<a class="button" href="' . esc_url($this->pageUrl('pov-calendar', ['pov_month' => $monthStart->modify('+1 month')->format('Y-m')])) . '">›</a>';
         echo '</div>';
         echo $this->adminCalendarGrid($monthStart, $events);
         echo '<div class="pov-admin-calendar-legend"><span>Buchbar</span><span>Auf Anfrage</span><span>Nicht buchbar</span><span>Bestätigter Termin</span><span>Offene Anfrage</span></div>';
         echo '</section>';
 
-        echo '<section class="pov-admin-panel pov-calendar-sidebar">';
-        echo $this->calendarExportPanel($appointments);
-        echo '<div class="pov-calendar-sidebar-divider" aria-hidden="true"></div>';
-        echo '<h2>Zeitraum pflegen</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form" data-pov-calendar-form>';
-        wp_nonce_field('pov_save_calendar_day');
-        echo '<input type="hidden" name="action" value="pov_save_calendar_day">';
-        echo '<div class="pov-admin-two"><label>Datum von <input type="date" name="calendar_date_from" data-date-start required></label>';
-        echo '<label>Datum bis <input type="date" name="calendar_date_to" data-date-end></label></div>';
-        echo '<label>Status <select name="availability_state"><option value="available">Buchbar</option><option value="limited">Auf Anfrage</option><option value="unavailable">Nicht buchbar</option></select></label>';
-        echo '<label>Öffentliche Notiz <input name="public_note"></label>';
-        echo '<label>Interne Notiz <textarea name="internal_note"></textarea></label>';
-        echo '<details class="pov-calendar-start"><summary>Startpunkt ändern</summary>';
-        echo '<div class="pov-admin-two"><label>Startpunkt PLZ <input name="custom_start_postal_code" inputmode="numeric" pattern="[0-9]{5}" maxlength="5"></label>';
-        echo '<label>Startpunkt Ort <input name="custom_start_city"></label></div>';
-        echo '<label>Name <input name="custom_start_label" placeholder="z. B. Lager Tübingen"></label>';
-        echo '<div class="pov-admin-two"><label>Startpunkt Latitude <input name="custom_start_latitude"></label>';
-        echo '<label>Startpunkt Longitude <input name="custom_start_longitude"></label></div></details>';
-        echo '<p><button class="button button-primary">Speichern</button></p></form></section>';
+        if (current_user_can(Capabilities::EXPORT_CALENDAR) || current_user_can(Capabilities::MANAGE_CALENDAR)) {
+            echo '<section class="pov-admin-panel pov-calendar-sidebar">';
+            if (current_user_can(Capabilities::EXPORT_CALENDAR)) {
+                echo $this->calendarExportPanel($appointments);
+            }
+            if (current_user_can(Capabilities::MANAGE_CALENDAR)) {
+                if (current_user_can(Capabilities::EXPORT_CALENDAR)) {
+                    echo '<div class="pov-calendar-sidebar-divider" aria-hidden="true"></div>';
+                }
+                echo '<h2>Zeitraum pflegen</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form" data-pov-calendar-form>';
+                wp_nonce_field('pov_save_calendar_day');
+                echo '<input type="hidden" name="action" value="pov_save_calendar_day">';
+                echo '<div class="pov-admin-two"><label>Datum von <input type="date" name="calendar_date_from" data-date-start required></label>';
+                echo '<label>Datum bis <input type="date" name="calendar_date_to" data-date-end></label></div>';
+                echo '<label>Status <select name="availability_state"><option value="available">Buchbar</option><option value="limited">Auf Anfrage</option><option value="unavailable">Nicht buchbar</option></select></label>';
+                echo '<label>Öffentliche Notiz <input name="public_note"></label>';
+                echo '<label>Interne Notiz <textarea name="internal_note"></textarea></label>';
+                echo '<details class="pov-calendar-start"><summary>Startpunkt ändern</summary>';
+                echo '<div class="pov-admin-two"><label>Startpunkt PLZ <input name="custom_start_postal_code" inputmode="numeric" pattern="[0-9]{5}" maxlength="5"></label>';
+                echo '<label>Startpunkt Ort <input name="custom_start_city"></label></div>';
+                echo '<label>Name <input name="custom_start_label" placeholder="z. B. Lager Tübingen"></label>';
+                echo '<div class="pov-admin-two"><label>Startpunkt Latitude <input name="custom_start_latitude"></label>';
+                echo '<label>Startpunkt Longitude <input name="custom_start_longitude"></label></div></details>';
+                echo '<p><button class="button button-primary">Speichern</button></p></form>';
+            }
+            echo '</section>';
+        }
         echo '</div>';
         $this->footer();
     }
 
     public function routes(): void
     {
+        $this->requireCapability(Capabilities::VIEW_TOURS);
         $clusters = (new WeeklyClusterService())->clusters();
         $this->renderRouteTimeline($clusters);
     }
 
     public function statistics(): void
     {
+        $this->requireCapability(Capabilities::VIEW_STATISTICS);
         $period = sanitize_key((string) ($_GET['period'] ?? 'week'));
         $report = (new StatisticsService())->report($period);
         $rows = (array) $report['rows'];
@@ -211,7 +249,7 @@ final class Menu
         $this->setupNotice();
         echo '<nav class="pov-period-switch" aria-label="Zeitraum">';
         foreach (['week' => 'KW', 'month' => 'Monat', 'year' => 'Jahr'] as $value => $label) {
-            echo '<a class="button' . ($report['period'] === $value ? ' button-primary' : '') . '" href="' . esc_url(admin_url('admin.php?page=pov-statistics&period=' . $value)) . '">' . esc_html($label) . '</a>';
+            echo '<a class="button' . ($report['period'] === $value ? ' button-primary' : '') . '" href="' . esc_url($this->pageUrl('pov-statistics', ['period' => $value])) . '">' . esc_html($label) . '</a>';
         }
         echo '</nav>';
         echo '<div class="pov-route-overview pov-stat-overview"><div><span>Fahrstrecke</span><strong>' . esc_html(number_format((float) $totals['distance_km'], 0, ',', '.') . ' km') . '</strong></div><div><span>Fahrtkosten</span><strong>' . esc_html(number_format((float) $totals['route_cost'], 2, ',', '.') . ' €') . '</strong></div><div><span>Personalkosten</span><strong>' . esc_html(number_format((float) $totals['personnel_cost'], 2, ',', '.') . ' €') . '</strong></div><div><span>Gesamtkosten</span><strong>' . esc_html(number_format((float) $totals['total_cost'], 2, ',', '.') . ' €') . '</strong></div></div>';
@@ -266,7 +304,7 @@ final class Menu
             }
             $source = ['heigit' => 'HeiGIT-Straßenmatrix', 'osrm' => 'Straßenmatrix', 'estimated' => 'Geschätzte Fahrzeit'][(string) $cluster['matrix_source']] ?? 'Routendaten';
             echo '<article class="pov-route-cluster' . ($cluster['priority'] === 'recommended' ? ' is-recommended' : '') . '"><header><div><span class="pov-admin-eyebrow">' . esc_html(GermanDateFormatter::short((string) $cluster['week_start']) . ' – ' . GermanDateFormatter::short((string) $cluster['week_end'])) . '</span><h2>' . esc_html((string) $cluster['title']) . '</h2><p>' . esc_html($stopSummary . ' · Start ' . (string) $cluster['start_label']) . '</p></div><span class="pov-route-badge">' . ($cluster['priority'] === 'recommended' ? 'Empfohlen' : 'Entwurf') . '</span></header>';
-            echo '<div class="pov-route-metrics"><div><span>Tourstrecke</span><strong>' . esc_html(number_format((float) $cluster['route_distance_km'], 0, ',', '.') . ' km') . '</strong><small>' . esc_html($source) . '</small></div><div><span>Fahrzeit</span><strong>' . esc_html($this->durationLabel((float) $cluster['route_duration_minutes'])) . '</strong><small>inklusive Rückfahrt</small></div><div><span>Fahrtkosten</span><strong>' . esc_html(number_format((float) $cluster['estimated_cost'], 2, ',', '.') . ' €') . '</strong><small>' . esc_html('Ersparnis ' . number_format((float) $cluster['cost_saved'], 2, ',', '.') . ' €') . '</small></div></div>';
+            echo '<div class="pov-route-metrics"><div><span>Tourstrecke</span><strong>' . esc_html(number_format((float) $cluster['route_distance_km'], 0, ',', '.') . ' km') . '</strong><small>' . esc_html($source) . '</small></div><div><span>Fahrzeit</span><strong>' . esc_html($this->durationLabel((float) $cluster['route_duration_minutes'])) . '</strong><small>inklusive Rückfahrt</small></div><div><span>Fahrtkosten</span><strong>' . esc_html(number_format((float) $cluster['estimated_cost'], 2, ',', '.') . ' €') . '</strong></div></div>';
             echo '<div class="pov-tour-timeline"><div class="pov-tour-depot"><span>S</span><div><small>Start</small><strong>' . esc_html((string) $cluster['start_label']) . '</strong></div></div>';
             foreach ($stops as $index => $stop) {
                 $leg = (array) ($legs[$index] ?? []);
@@ -276,7 +314,7 @@ final class Menu
                 $requestId = $confirmed ? (int) ($stop['request_id'] ?? 0) : (int) ($stop['id'] ?? 0);
                 $dateType = $confirmed ? 'Bestätigt' : (! empty($stop['_optimized_date']) ? 'Routenempfehlung' : 'Anfrage');
                 echo '<div class="pov-tour-stop' . ($confirmed ? ' is-confirmed' : '') . '"><time datetime="' . esc_attr($date) . '"><strong>' . esc_html(GermanDateFormatter::weekdayShort($date)) . '</strong><span>' . esc_html(mysql2date('d.m.', $date)) . '</span></time><div><small>' . esc_html($dateType) . '</small><strong>' . esc_html((string) $stop['institution_name']) . '</strong><span>' . esc_html((string) $stop['postal_code'] . ' ' . (string) $stop['city']) . '</span></div>';
-                echo $requestId > 0 ? '<a class="button" href="' . esc_url(admin_url('admin.php?page=pov-requests&request_id=' . $requestId)) . '">Öffnen</a></div>' : '</div>';
+                echo $requestId > 0 && current_user_can(Capabilities::VIEW_REQUESTS) ? '<a class="button" href="' . esc_url($this->pageUrl('pov-requests', ['request_id' => $requestId])) . '">Öffnen</a></div>' : '</div>';
                 foreach ((array) ($overnights[$index] ?? []) as $overnight) {
                     echo '<div class="pov-tour-overnight"><span aria-hidden="true">Zzz</span><div><small>Übernachtungsregion</small><strong>' . esc_html((string) $overnight['place']) . '</strong><em>' . esc_html((string) $overnight['reason']) . '</em></div></div>';
                 }
@@ -295,7 +333,7 @@ final class Menu
 
     private function routeIssues(array $clusters): void
     {
-        if (! $clusters) {
+        if (! $clusters || ! current_user_can(Capabilities::MANAGE_TOURS)) {
             return;
         }
         echo '<section class="pov-admin-panel pov-route-issues"><div><span class="pov-admin-eyebrow">Nicht eingeplant</span><h2>Adresse korrigieren</h2><p>Zuerst vorhandene Angaben erneut prüfen. Bleibt der Eintrag offen, Adresse korrigieren.</p><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
@@ -309,7 +347,7 @@ final class Menu
                 $requestId = ($stop['_stop_type'] ?? '') === 'confirmed' ? (int) ($stop['request_id'] ?? 0) : (int) ($stop['id'] ?? 0);
                 echo '<li><span><strong>' . esc_html((string) $stop['institution_name']) . '</strong><small>' . esc_html(trim((string) ($stop['street'] ?? '') . ' ' . (string) ($stop['house_number'] ?? ''))) . '<br>' . esc_html((string) $stop['postal_code'] . ' ' . (string) $stop['city']) . '</small></span>';
                 if ($requestId > 0) {
-                    $editUrl = add_query_arg(['page' => 'pov-requests', 'request_id' => $requestId, 'edit_address' => '1'], admin_url('admin.php')) . '#pov-address-editor';
+                    $editUrl = $this->pageUrl('pov-requests', ['request_id' => $requestId, 'edit_address' => '1']) . '#pov-address-editor';
                     echo '<a class="button" href="' . esc_url($editUrl) . '">Adresse korrigieren</a></li>';
                 } else {
                     echo '<small>Kein Vorgang verknüpft</small></li>';
@@ -321,9 +359,11 @@ final class Menu
 
     public function settings(): void
     {
+        $this->requireCapability('manage_options');
         $states = (new StateRepository())->all(false);
         $this->header('Einstellungen');
         $this->setupNotice();
+        echo '<section class="pov-admin-panel pov-portal-access"><div><span class="pov-admin-eyebrow">Teamzugang</span><h2>Van Operations</h2><p>Operative Planung läuft im geschützten Portal. Weise Benutzerinnen und Benutzern die Rolle „Ocean Van Team“ oder „Ocean Van Lesend“ zu.</p></div><div class="pov-admin-welcome-actions"><a class="button button-primary" href="' . esc_url(OperationsPortal::url()) . '">Portal öffnen</a><a class="button" href="' . esc_url(admin_url('users.php')) . '">Benutzer verwalten</a></div></section>';
         echo $this->geoTestPanel();
         echo $this->testProfilePanel();
         echo '<section class="pov-admin-panel"><h2>Konfiguration</h2>';
@@ -383,7 +423,7 @@ final class Menu
 
     public function saveSettings(): void
     {
-        $this->guard('pov_save_settings');
+        $this->guard('pov_save_settings', 'manage_options');
         foreach (array_keys($this->settingsFields()) as $name) {
             if ($name === 'pov_heigit_api_key' && trim((string) ($_POST[$name] ?? '')) === '') {
                 continue;
@@ -400,14 +440,14 @@ final class Menu
 
     public function enableTestProfile(): void
     {
-        $this->guard('pov_enable_test_profile');
+        $this->guard('pov_enable_test_profile', 'manage_options');
         Activation::enableTestProfile(true);
         $this->redirect('pov-settings', ['pov_notice' => 'test-profile']);
     }
 
     public function testGeoConnection(): void
     {
-        $this->guard('pov_test_geo');
+        $this->guard('pov_test_geo', 'manage_options');
         $factory = new ProviderFactory();
         $geocode = $factory->geocoding()->geocodeAddress([
             'postal_code' => '70173',
@@ -439,14 +479,14 @@ final class Menu
 
     public function saveStates(): void
     {
-        $this->guard('pov_save_states');
+        $this->guard('pov_save_states', 'manage_options');
         (new StateRepository())->updateStates((array) ($_POST['states'] ?? []));
         $this->redirect('pov-settings');
     }
 
     public function saveCalendarDay(): void
     {
-        $this->guard('pov_save_calendar_day');
+        $this->guard('pov_save_calendar_day', Capabilities::MANAGE_CALENDAR);
         $from = sanitize_text_field((string) ($_POST['calendar_date_from'] ?? ($_POST['calendar_date'] ?? '')));
         $to = sanitize_text_field((string) ($_POST['calendar_date_to'] ?? ''));
         $start = $this->resolveCalendarStartPoint();
@@ -463,7 +503,7 @@ final class Menu
 
     public function recalculateSuggestions(): void
     {
-        $this->guard('pov_recalculate_suggestions');
+        $this->guard('pov_recalculate_suggestions', Capabilities::MANAGE_TOURS);
         $id = (int) ($_POST['request_id'] ?? 0);
         (new InternalSuggestionService())->recalculate($id);
         $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'recalculated']);
@@ -471,7 +511,7 @@ final class Menu
 
     public function suggestionState(): void
     {
-        $this->guard('pov_suggestion_state');
+        $this->guard('pov_suggestion_state', Capabilities::SEND_RESPONSES);
         $id = (int) ($_POST['suggestion_id'] ?? 0);
         $requestId = (int) ($_POST['request_id'] ?? 0);
         $state = sanitize_key((string) ($_POST['suggestion_state'] ?? ''));
@@ -481,7 +521,7 @@ final class Menu
 
     public function sendProposals(): void
     {
-        $this->guard('pov_send_proposals');
+        $this->guard('pov_send_proposals', Capabilities::SEND_RESPONSES);
         $id = (int) ($_POST['request_id'] ?? 0);
         $request = (new RequestRepository())->find($id);
         $suggestions = (new SuggestionRepository())->acceptedForRequest($id);
@@ -508,7 +548,7 @@ final class Menu
 
     public function confirmRequest(): void
     {
-        $this->guard('pov_confirm_request');
+        $this->guard('pov_confirm_request', Capabilities::MANAGE_REQUESTS);
         $id = (int) ($_POST['request_id'] ?? 0);
         $request = (new RequestRepository())->find($id);
         if ($request) {
@@ -535,7 +575,7 @@ final class Menu
 
     public function sendResponse(): void
     {
-        $this->guard('pov_send_response');
+        $this->guard('pov_send_response', Capabilities::SEND_RESPONSES);
         $id = (int) ($_POST['request_id'] ?? 0);
         $type = sanitize_key((string) ($_POST['response_type'] ?? ''));
         $message = sanitize_textarea_field((string) wp_unslash($_POST['message'] ?? ''));
@@ -593,7 +633,7 @@ final class Menu
 
     public function saveNote(): void
     {
-        $this->guard('pov_save_note');
+        $this->guard('pov_save_note', Capabilities::MANAGE_REQUESTS);
         $id = (int) ($_POST['request_id'] ?? 0);
         (new RequestRepository())->updateInternalNote($id, (string) ($_POST['internal_note'] ?? ''));
         $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'note-saved']);
@@ -601,7 +641,7 @@ final class Menu
 
     public function saveRequestAddress(): void
     {
-        $this->guard('pov_save_request_address');
+        $this->guard('pov_save_request_address', Capabilities::MANAGE_REQUESTS);
         $id = (int) ($_POST['request_id'] ?? 0);
         $repository = new RequestRepository();
         $request = $repository->find($id);
@@ -638,7 +678,7 @@ final class Menu
 
     public function retryMissingAddresses(): void
     {
-        $this->guard('pov_retry_missing_addresses');
+        $this->guard('pov_retry_missing_addresses', Capabilities::MANAGE_TOURS);
         $repository = new RequestRepository();
         $checked = 0;
         $found = 0;
@@ -662,7 +702,7 @@ final class Menu
 
     public function updateWorkflow(): void
     {
-        $this->guard('pov_update_workflow');
+        $this->guard('pov_update_workflow', Capabilities::MANAGE_REQUESTS);
         $id = (int) ($_POST['request_id'] ?? 0);
         $repository = new RequestRepository();
         $request = $repository->find($id);
@@ -695,7 +735,7 @@ final class Menu
 
     public function downloadIcs(): void
     {
-        $this->guard('pov_download_ics');
+        $this->guard('pov_download_ics', Capabilities::EXPORT_CALENDAR);
         $appointment = (new AppointmentRepository())->find((int) ($_GET['appointment_id'] ?? 0));
         if (! $appointment) {
             wp_die('Termin nicht gefunden.');
@@ -772,6 +812,7 @@ final class Menu
 
     private function adminCalendarGrid(DateTimeImmutable $monthStart, array $events): string
     {
+        $editable = current_user_can(Capabilities::MANAGE_CALENDAR);
         $html = '<div class="pov-admin-calendar-grid">';
         foreach (['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as $weekday) {
             $html .= '<div class="pov-admin-calendar-weekday">' . esc_html($weekday) . '</div>';
@@ -792,7 +833,9 @@ final class Menu
                 $state = 'confirmed';
             }
             $classes = 'pov-admin-calendar-day is-' . sanitize_html_class($state);
-            $html .= '<button type="button" class="' . esc_attr($classes) . '" data-pov-calendar-day data-date="' . esc_attr($date) . '" data-state="' . esc_attr((string) ($event['day']['availability_state'] ?? 'available')) . '" data-public-note="' . esc_attr((string) ($event['day']['public_note'] ?? '')) . '" data-internal-note="' . esc_attr((string) ($event['day']['internal_note'] ?? '')) . '" data-start-label="' . esc_attr((string) ($event['day']['custom_start_label'] ?? '')) . '" data-start-lat="' . esc_attr((string) ($event['day']['custom_start_latitude'] ?? '')) . '" data-start-lon="' . esc_attr((string) ($event['day']['custom_start_longitude'] ?? '')) . '">';
+            $html .= $editable
+                ? '<button type="button" class="' . esc_attr($classes) . '" data-pov-calendar-day data-date="' . esc_attr($date) . '" data-state="' . esc_attr((string) ($event['day']['availability_state'] ?? 'available')) . '" data-public-note="' . esc_attr((string) ($event['day']['public_note'] ?? '')) . '" data-internal-note="' . esc_attr((string) ($event['day']['internal_note'] ?? '')) . '" data-start-label="' . esc_attr((string) ($event['day']['custom_start_label'] ?? '')) . '" data-start-lat="' . esc_attr((string) ($event['day']['custom_start_latitude'] ?? '')) . '" data-start-lon="' . esc_attr((string) ($event['day']['custom_start_longitude'] ?? '')) . '">'
+                : '<div class="' . esc_attr($classes) . '">';
             $html .= '<strong>' . esc_html($day->format('j')) . '</strong>';
             $html .= '<span>' . esc_html($this->calendarStateLabel($state, $event)) . '</span>';
             if (! empty($event['requests'])) {
@@ -801,7 +844,7 @@ final class Menu
             if (! empty($event['suggestions'])) {
                 $html .= '<em>' . esc_html((string) $event['suggestions']) . ' Vorschlag' . ((int) $event['suggestions'] === 1 ? '' : 'e') . '</em>';
             }
-            $html .= '</button>';
+            $html .= $editable ? '</button>' : '</div>';
         }
 
         return $html . '</div>';
@@ -833,7 +876,7 @@ final class Menu
             echo '<td data-label="Termin"><span>' . esc_html($this->requestDateLabel($item)) . '</span>' . ($warnings > 0 ? '<small class="pov-table-warning">' . esc_html((string) $warnings) . ' Vor-Ort-Hinweis' . ($warnings === 1 ? '' : 'e') . '</small>' : '') . '</td>';
             echo '<td data-label="Route"><strong>' . esc_html($route) . '</strong><small>' . (is_numeric($item['latitude'] ?? null) ? 'Geocodiert' : 'Adresse prüfen') . '</small></td>';
             echo '<td data-label="Status"><span class="pov-status is-' . esc_attr($item['work_state']) . '">' . esc_html(WorkState::labels()[$item['work_state']] ?? $item['work_state']) . '</span><small>' . esc_html(RequestStatus::labels()[$item['main_status']] ?? $item['main_status']) . '</small></td>';
-            echo '<td><a class="button pov-open-button" href="' . esc_url(admin_url('admin.php?page=pov-requests&request_id=' . (int) $item['id'])) . '">Öffnen →</a></td></tr>';
+            echo '<td><a class="button pov-open-button" href="' . esc_url($this->pageUrl('pov-requests', ['request_id' => (int) $item['id']])) . '">Öffnen →</a></td></tr>';
         }
         if (! $items) {
             echo '<tr><td colspan="6"><div class="pov-admin-empty"><strong>Keine Anfragen in dieser Ansicht.</strong><span>Passt die Filter an oder setzt sie zurück.</span></div></td></tr>';
@@ -1054,13 +1097,16 @@ final class Menu
         echo '<p><a href="mailto:' . esc_attr($request['contact_email']) . '">' . esc_html($request['contact_email']) . '</a><br><a href="tel:' . esc_attr(preg_replace('/[^0-9+]/', '', (string) $request['contact_phone'])) . '">' . esc_html($request['contact_phone']) . '</a></p>';
         echo '<div class="pov-address-display"><address>' . esc_html($request['street'] . ' ' . $request['house_number']) . '<br>' . esc_html($request['postal_code'] . ' ' . $request['city']) . '<br>' . esc_html((string) $request['state_code']) . '</address>';
         echo '<span class="pov-address-status ' . ($geocoded ? 'is-ok' : 'is-error') . '">' . ($geocoded ? ($routeReady ? 'Adresse & Route geprüft' : 'Adresse geprüft') : 'Prüfung offen') . '</span></div>';
-        echo '<details id="pov-address-editor" class="pov-address-editor"' . ($open ? ' open' : '') . '><summary>Adresse ändern</summary><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
-        wp_nonce_field('pov_save_request_address');
-        echo '<input type="hidden" name="action" value="pov_save_request_address"><input type="hidden" name="request_id" value="' . esc_attr((string) $request['id']) . '">';
-        echo '<div class="pov-admin-two"><label>Straße <input name="street" value="' . esc_attr((string) $request['street']) . '" required></label><label>Hausnummer <input name="house_number" value="' . esc_attr((string) $request['house_number']) . '" required></label></div>';
-        echo '<div class="pov-admin-two"><label>PLZ <input name="postal_code" value="' . esc_attr((string) $request['postal_code']) . '" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required></label><label>Ort <input name="city" value="' . esc_attr((string) $request['city']) . '" required></label></div>';
-        echo '<label>Bundesland <select name="state_code" required>' . $this->options($stateOptions, (string) $request['state_code']) . '</select></label>';
-        echo '<button class="button button-primary">Speichern &amp; erneut prüfen</button></form></details></section>';
+        if (current_user_can(Capabilities::MANAGE_REQUESTS)) {
+            echo '<details id="pov-address-editor" class="pov-address-editor"' . ($open ? ' open' : '') . '><summary>Adresse ändern</summary><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
+            wp_nonce_field('pov_save_request_address');
+            echo '<input type="hidden" name="action" value="pov_save_request_address"><input type="hidden" name="request_id" value="' . esc_attr((string) $request['id']) . '">';
+            echo '<div class="pov-admin-two"><label>Straße <input name="street" value="' . esc_attr((string) $request['street']) . '" required></label><label>Hausnummer <input name="house_number" value="' . esc_attr((string) $request['house_number']) . '" required></label></div>';
+            echo '<div class="pov-admin-two"><label>PLZ <input name="postal_code" value="' . esc_attr((string) $request['postal_code']) . '" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required></label><label>Ort <input name="city" value="' . esc_attr((string) $request['city']) . '" required></label></div>';
+            echo '<label>Bundesland <select name="state_code" required>' . $this->options($stateOptions, (string) $request['state_code']) . '</select></label>';
+            echo '<button class="button button-primary">Speichern &amp; erneut prüfen</button></form></details>';
+        }
+        echo '</section>';
         return (string) ob_get_clean();
     }
 
@@ -1237,18 +1283,30 @@ final class Menu
 
     private function header(string $title): void
     {
-        $current = sanitize_key((string) ($_GET['page'] ?? 'pov-requests'));
-        echo '<div class="wrap pov-admin"><header class="pov-admin-header"><div class="pov-admin-brand"><img src="' . esc_url(POV_PLUGIN_URL . 'assets/brand/pro-ocean-symbol-blue.svg') . '" alt=""><div><span>Pro Ocean</span><strong>Van Operations</strong></div></div><nav aria-label="Ocean-Van-Bereiche">';
+        $current = $this->portal
+            ? OperationsPortal::pageForView(sanitize_key((string) ($_GET['view'] ?? 'requests')))
+            : sanitize_key((string) ($_GET['page'] ?? 'pov-settings'));
+        echo '<div class="' . ($this->portal ? '' : 'wrap ') . 'pov-admin"><header class="pov-admin-header"><div class="pov-admin-brand"><img src="' . esc_url(POV_PLUGIN_URL . 'assets/brand/pro-ocean-symbol-blue.svg') . '" alt=""><div><span>Pro Ocean</span><strong>Van Operations</strong></div></div><nav aria-label="Ocean-Van-Bereiche">';
         foreach ([
             'pov-requests' => 'Anfragen',
             'pov-routes' => 'Tourplanung',
             'pov-statistics' => 'Statistik',
             'pov-calendar' => 'Kalender',
-            'pov-settings' => 'Einstellungen',
         ] as $page => $label) {
-            echo '<a class="' . ($current === $page ? 'is-current' : '') . '" ' . ($current === $page ? 'aria-current="page" ' : '') . 'href="' . esc_url(admin_url('admin.php?page=' . $page)) . '">' . esc_html($label) . '</a>';
+            if (! current_user_can(Capabilities::viewForPage($page))) {
+                continue;
+            }
+            echo '<a class="' . ($current === $page ? 'is-current' : '') . '" ' . ($current === $page ? 'aria-current="page" ' : '') . 'href="' . esc_url(OperationsPortal::url($page)) . '">' . esc_html($label) . '</a>';
         }
-        echo '</nav></header><div class="pov-admin-title"><div><span class="pov-admin-eyebrow">Ocean Van</span><h1>' . esc_html($title) . '</h1></div></div>';
+        echo '</nav><div class="pov-admin-usernav">';
+        if (current_user_can('manage_options')) {
+            echo '<a href="' . esc_url(admin_url('admin.php?page=pov-settings')) . '"' . ($current === 'pov-settings' ? ' aria-current="page" class="is-current"' : '') . '>Einstellungen</a>';
+        }
+        $user = wp_get_current_user();
+        if ($this->portal) {
+            echo '<span>' . esc_html($user->display_name) . '</span><a href="' . esc_url(wp_logout_url(home_url('/'))) . '">Abmelden</a>';
+        }
+        echo '</div></header><div class="pov-admin-title"><div><span class="pov-admin-eyebrow">Ocean Van</span><h1>' . esc_html($title) . '</h1></div></div>';
     }
 
     private function footer(): void
@@ -1376,22 +1434,41 @@ final class Menu
         return (string) ob_get_clean();
     }
 
-    private function capability(): string
+    private function pageUrl(string $page, array $args = []): string
     {
-        return (string) apply_filters('pov_manage_capability', 'manage_options');
+        if ($this->portal || $page !== 'pov-settings') {
+            return OperationsPortal::url($page, $args);
+        }
+        return add_query_arg(array_merge(['page' => $page], $args), admin_url('admin.php'));
     }
 
-    private function guard(string $nonce): void
+    private function navigationField(string $page): string
     {
-        if (! current_user_can($this->capability())) {
-            wp_die('Keine Berechtigung.');
+        if (! $this->portal) {
+            return '<input type="hidden" name="page" value="' . esc_attr($page) . '">';
         }
+        $view = OperationsPortal::viewForPage($page);
+        return $view === 'requests' ? '' : '<input type="hidden" name="view" value="' . esc_attr($view) . '">';
+    }
+
+    private function requireCapability(string $capability): void
+    {
+        if (! current_user_can($capability)) {
+            wp_die('Keine Berechtigung.', 'Zugriff verweigert', ['response' => 403]);
+        }
+    }
+
+    private function guard(string $nonce, string $capability): void
+    {
+        $this->requireCapability($capability);
         check_admin_referer($nonce);
     }
 
     private function redirect(string $page, array $args = []): void
     {
-        wp_safe_redirect(add_query_arg(array_merge(['page' => $page, 'pov_notice' => 'saved'], $args), admin_url('admin.php')));
+        $notice = isset($args['pov_notice']) ? (string) $args['pov_notice'] : 'saved';
+        unset($args['pov_notice']);
+        wp_safe_redirect($this->pageUrl($page, array_merge(['pov_notice' => $notice], $args)));
         exit;
     }
 }

@@ -27,6 +27,66 @@ function Assert-NotContains($relative, $needle, $message) {
 Assert-True (Test-Path (Join-Path $root 'assets/vendor/pov-calendar/pov-calendar.js')) 'local calendar module exists'
 Assert-True ((Get-Item (Join-Path $root 'assets/brand/pro-ocean-logo-blue.svg')).Length -gt 50000) 'supplied logo SVG is installed'
 Assert-True ((Get-Item (Join-Path $root 'assets/brand/pro-ocean-symbol-blue.svg')).Length -gt 50000) 'supplied symbol SVG is installed'
+Assert-True (Test-Path (Join-Path $root 'src/Portal/OperationsPortal.php')) 'hybrid operations portal controller exists'
+Assert-True (Test-Path (Join-Path $root 'src/Security/Capabilities.php')) 'operations capability matrix exists'
+Assert-True (Test-Path (Join-Path $root 'templates/operations-portal.php')) 'standalone operations portal template exists'
+Assert-True (Test-Path (Join-Path $root 'assets/dist/portal.css')) 'standalone operations portal styles exist'
+
+Assert-Contains 'src/Portal/OperationsPortal.php' "public const SLUG = 'van-operations'" 'operations portal uses the stable /van-operations path'
+Assert-Contains 'src/Portal/OperationsPortal.php' 'is_user_logged_in()' 'operations portal requires a personal WordPress login'
+Assert-Contains 'src/Portal/OperationsPortal.php' 'auth_redirect();' 'unauthenticated portal visitors are sent to WordPress login'
+Assert-Contains 'src/Portal/OperationsPortal.php' 'current_user_can(Capabilities::ACCESS_PORTAL)' 'operations portal checks its access capability server-side'
+Assert-Contains 'src/Portal/OperationsPortal.php' 'nocache_headers();' 'protected portal responses disable HTTP caching'
+Assert-Contains 'src/Portal/OperationsPortal.php' "define('DONOTCACHEPAGE', true)" 'protected portal opts out of page caches'
+Assert-Contains 'src/Portal/OperationsPortal.php' 'X-Robots-Tag: noindex, nofollow, noarchive, nosnippet' 'protected portal sends a noindex header'
+Assert-Contains 'src/Portal/OperationsPortal.php' "get_post_meta(`$pageId, '_pov_operations_portal', true) === '1'" 'portal reuses only a page it owns'
+Assert-NotContains 'src/Portal/OperationsPortal.php' 'get_page_by_path(self::SLUG' 'portal never adopts an unrelated page with the same slug'
+Assert-Contains 'src/Portal/OperationsPortal.php' 'self::firstAllowedPage() === null' 'portal denies incomplete access assignments without a redirect loop'
+Assert-Contains 'templates/operations-portal.php' 'noindex,nofollow,noarchive,nosnippet' 'protected portal template includes a robots fallback'
+Assert-NotContains 'src/Portal/OperationsPortal.php' 'post_password' 'operations portal does not use a shared page password'
+Assert-Contains 'src/Plugin.php' '(new OperationsPortal())->register();' 'plugin registers the hybrid operations portal'
+Assert-Contains 'src/Activation.php' 'Capabilities::syncRoles();' 'activation installs the operations roles'
+Assert-Contains 'src/Activation.php' 'OperationsPortal::ensurePage();' 'activation creates the operations portal page'
+
+$capabilitiesText = Read-Text 'src/Security/Capabilities.php'
+$teamMatch = [regex]::Match($capabilitiesText, '\$teamCaps\s*=\s*array_fill_keys\(\[(?<caps>.*?)\],\s*true\);', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+$readerMatch = [regex]::Match($capabilitiesText, '\$readerCaps\s*=\s*array_fill_keys\(\[(?<caps>.*?)\],\s*true\);', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+Assert-True $teamMatch.Success 'team role capability block is explicit'
+Assert-True $readerMatch.Success 'read-only role capability block is explicit'
+$teamCapabilities = $teamMatch.Groups['caps'].Value
+$readerCapabilities = $readerMatch.Groups['caps'].Value
+Assert-Contains 'src/Security/Capabilities.php' "public const TEAM_ROLE = 'pov_van_team'" 'team role has a stable role key'
+Assert-Contains 'src/Security/Capabilities.php' "public const READER_ROLE = 'pov_van_reader'" 'read-only role has a stable role key'
+foreach ($capability in @('ACCESS_PORTAL', 'VIEW_REQUESTS', 'MANAGE_REQUESTS', 'SEND_RESPONSES', 'VIEW_TOURS', 'MANAGE_TOURS', 'VIEW_CALENDAR', 'MANAGE_CALENDAR', 'VIEW_STATISTICS', 'EXPORT_CALENDAR')) {
+    Assert-True ($teamCapabilities.Contains("self::$capability")) "team role receives $capability"
+}
+foreach ($capability in @('ACCESS_PORTAL', 'VIEW_TOURS', 'VIEW_CALENDAR', 'VIEW_STATISTICS')) {
+    Assert-True ($readerCapabilities.Contains("self::$capability")) "read-only role receives $capability"
+}
+foreach ($capability in @('VIEW_REQUESTS', 'MANAGE_REQUESTS', 'SEND_RESPONSES', 'MANAGE_TOURS', 'MANAGE_CALENDAR', 'EXPORT_CALENDAR', 'MANAGE_PRIVACY')) {
+    Assert-True (-not $readerCapabilities.Contains("self::$capability")) "read-only role does not receive $capability"
+}
+
+$menuText = Read-Text 'src/Admin/Menu.php'
+$adminMenuMatch = [regex]::Match($menuText, 'public function menus\(\): void\s*\{(?<body>.*?)\n\s*\}\s*\n\s*public function assets', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+Assert-True $adminMenuMatch.Success 'WordPress admin menu registration can be audited'
+$adminMenuBody = $adminMenuMatch.Groups['body'].Value
+Assert-True ($adminMenuBody.Contains("'pov-settings'")) 'WordPress admin keeps technical settings'
+foreach ($operationalPage in @('pov-requests', 'pov-routes', 'pov-statistics', 'pov-calendar')) {
+    Assert-True (-not $adminMenuBody.Contains("'$operationalPage'")) "WordPress admin does not register $operationalPage"
+}
+Assert-Contains 'src/Admin/Menu.php' 'current_user_can(Capabilities::EXPORT_CALENDAR)' 'calendar export is rendered only with its capability'
+Assert-Contains 'src/Admin/Menu.php' 'current_user_can(Capabilities::MANAGE_CALENDAR)' 'calendar mutation fields are rendered only with their capability'
+Assert-Contains 'src/Admin/Menu.php' 'current_user_can(Capabilities::SEND_RESPONSES)' 'response mutations are rendered only with their capability'
+Assert-Contains 'src/Admin/Menu.php' 'current_user_can(Capabilities::MANAGE_REQUESTS)' 'request mutations are rendered only with their capability'
+Assert-Contains 'src/Admin/Menu.php' '$this->guard(''pov_save_calendar_day'', Capabilities::MANAGE_CALENDAR)' 'calendar writes use a granular server-side guard'
+Assert-Contains 'src/Admin/Menu.php' '$this->guard(''pov_recalculate_suggestions'', Capabilities::MANAGE_TOURS)' 'tour recalculation uses a granular server-side guard'
+Assert-Contains 'src/Admin/Menu.php' '$this->guard(''pov_send_response'', Capabilities::SEND_RESPONSES)' 'outgoing responses use a granular server-side guard'
+Assert-Contains 'src/Admin/Menu.php' '$this->guard(''pov_save_request_address'', Capabilities::MANAGE_REQUESTS)' 'address changes use a granular server-side guard'
+Assert-Contains 'src/Admin/Menu.php' '$this->guard(''pov_download_ics'', Capabilities::EXPORT_CALENDAR)' 'calendar downloads use a granular server-side guard'
+Assert-Contains 'src/Rest/AdminController.php' "current_user_can(`$capability)" 'operations REST routes enforce their declared capability'
+Assert-Contains 'src/Service/MailService.php' "OperationsPortal::url('pov-requests'" 'team notification links open the protected portal'
+Assert-NotContains 'src/Service/MailService.php' 'admin.php?page=pov-requests' 'team notification no longer links into wp-admin'
 
 Assert-Contains 'assets/dist/frontend.js' 'new window.POVCalendar' 'frontend uses bundled calendar module'
 Assert-Contains 'assets/dist/frontend.js' 'async function checkRoute' 'frontend checks route suggestions on demand'
@@ -97,6 +157,8 @@ Assert-Contains 'src/Service/PublicRecommendationService.php' 'PostalCodeService
 Assert-Contains 'src/Service/PublicRecommendationService.php' "'direct'" 'weeks without tour stops reuse one direct-route calculation'
 Assert-Contains 'src/Service/PublicRecommendationService.php' 'array_slice($suggestions, 0, 2)' 'recommendation API returns two best route dates'
 Assert-Contains 'src/Service/PublicRecommendationService.php' 'weekSuggestions' 'public recommendations group good days into weeks'
+Assert-Contains 'src/Service/PublicRecommendationService.php' "'suggestions' => `$publicSuggestions" 'public recommendation response uses a minimal date DTO'
+Assert-NotContains 'src/Service/PublicRecommendationService.php' "'route_context'" 'public recommendation response omits geocoding coordinates'
 Assert-Contains 'src/Service/PublicRecommendationService.php' 'PlanningSignalService' 'public recommendations combine routing with weekly and regional demand'
 Assert-Contains 'src/Service/PlanningSignalService.php' 'WEEK_FILLING' 'planning signals prioritize filling active weeks'
 Assert-Contains 'src/Service/PlanningSignalService.php' 'SAME_STATE_CLUSTER' 'planning signals aggregate requests by federal state'
@@ -128,8 +190,11 @@ Assert-Contains 'playground/index.html' 'delete configured.login' 'public bookin
 Assert-Contains 'playground/index.html' '?mode=seamless' 'public demo hides the Playground developer chrome'
 Assert-Contains 'playground/blueprint.template.json' 'DemoDataService' 'Playground demo creates safe example records'
 Assert-Contains 'playground/blueprint.template.json' 'pre_wp_mail' 'Playground demo disables outgoing mail'
+Assert-Contains 'playground/blueprint.template.json' "update_option('permalink_structure', '/%postname%/')" 'Playground configures the portal landing path explicitly'
+Assert-Contains 'playground/blueprint.template.json' 'flush_rewrite_rules();' 'Playground activates its portal rewrite rules'
 Assert-Contains 'playground/index.html' 'https://playground.wordpress.net/' 'public launcher opens WordPress Playground'
 Assert-Contains '.github/workflows/pages.yml' 'actions/deploy-pages@v4' 'GitHub Pages deployment is automated'
+Assert-Contains '.github/workflows/release.yml' 'gh release create' 'version tags publish the installable plugin archive'
 Assert-Contains 'src/Database/Schema.php' 'sort_order INT UNSIGNED' 'suggestion ordering avoids the reserved SQL rank keyword'
 Assert-NotContains 'src/Database/Schema.php' 'rank INT UNSIGNED' 'suggestion schema no longer uses a reserved SQL keyword'
 Assert-Contains 'src/Service/MailService.php' 'renderProposalHtml' 'proposal mails render HTML buttons'

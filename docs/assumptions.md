@@ -1,6 +1,9 @@
 # Annahmen
 
 - Das MVP wird als eigenständiges Plugin unter `wp-content/plugins/pro-ocean-van` installiert.
+- Operative Teamarbeit findet unter `/van-operations/` mit persönlichen WordPress-Konten statt; ein gemeinsames Seitenpasswort wird nicht verwendet.
+- Die Rolle `Ocean Van Team` bearbeitet Anfragen, Touren und Kalender. `Ocean Van Lesend` sieht Touren, Kalender und Statistik ohne Kontakte, Änderungen oder Kalenderexport.
+- Das WordPress-Backend bleibt Administratoren für Benutzerverwaltung und technische Einstellungen vorbehalten.
 - Die gelieferten SVG-Dateien `05_Pro_Ocean_Logo_Blau.svg` und `07_Pro_Ocean_Symbol_Blau.svg` sind unverändert unter `assets/brand/` eingebunden.
 - Bundesland `BW` ist initial aktiv, alle weiteren Bundesländer sind initial deaktiviert und im Backend aktivierbar.
 - Der Standardstartpunkt ist `Tübingen`, Koordinaten werden nicht geraten und müssen im Backend gesetzt oder über einen Geocoding-Provider ermittelt werden.

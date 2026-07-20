@@ -3,7 +3,7 @@ Contributors: proocean
 Tags: booking, calendar, routing
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.5.2
+Stable tag: 0.6.0
 License: GPLv2 or later
 
 Route-first Ocean-Van-Buchung und kostenoptimierte Tourenplanung für WordPress.
@@ -16,11 +16,18 @@ Das Plugin stellt den Shortcode [pro_ocean_van_booking], routenoptimierte Termin
 
 1. Pluginordner nach wp-content/plugins/pro-ocean-van kopieren.
 2. Plugin aktivieren.
-3. Unter Ocean Van → Einstellungen HeiGIT für Routing und Geocoding wählen, API-Schlüssel speichern und die Verbindung testen.
+3. Im WordPress-Menü Ocean Van HeiGIT für Routing und Geocoding wählen, API-Schlüssel speichern und die Verbindung testen.
 4. Startpunkt, Kosten, Personal und Team-E-Mail-Adressen pflegen.
 5. Shortcode in eine Seite einfügen.
 
 == Changelog ==
+
+= 0.6.0 =
+* Operative Planung in ein eigenes, login-geschütztes Van-Operations-Portal verschoben.
+* Persönliche Team- und Leserrollen mit getrennten Berechtigungen für Anfragen, Touren, Kalender, Statistik und Export ergänzt.
+* WordPress-Backend auf Benutzerverwaltung und technische Einstellungen reduziert.
+* Portal gegen Caching, Suchmaschinenindexierung und unberechtigten Zugriff abgesichert.
+* Benachrichtigungslinks und alle operativen Rückwege führen direkt ins Portal.
 
 = 0.5.2 =
 * Fehlende lokale Kalender-Assets werden vollständig mit dem Plugin ausgeliefert.
