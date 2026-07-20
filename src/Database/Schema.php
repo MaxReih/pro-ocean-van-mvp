@@ -1,0 +1,179 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ProOceanVan\Database;
+
+final class Schema
+{
+    public const VERSION = '2026.07.15.1';
+
+    /**
+     * @return string[]
+     */
+    public function sql(): array
+    {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+        $prefix = $wpdb->prefix;
+
+        return [
+            "CREATE TABLE {$prefix}pov_requests (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                public_uuid VARCHAR(64) NOT NULL,
+                main_status VARCHAR(32) NOT NULL DEFAULT 'received',
+                work_state VARCHAR(32) NOT NULL DEFAULT 'new',
+                request_mode VARCHAR(32) NOT NULL,
+                specific_requested_date DATE NULL,
+                desired_date_from DATE NULL,
+                desired_date_to DATE NULL,
+                possible_weekdays VARCHAR(128) NULL,
+                institution_name VARCHAR(255) NOT NULL,
+                institution_type VARCHAR(120) NOT NULL,
+                contact_first_name VARCHAR(120) NOT NULL,
+                contact_last_name VARCHAR(120) NOT NULL,
+                contact_email VARCHAR(190) NOT NULL,
+                contact_phone VARCHAR(80) NOT NULL,
+                street VARCHAR(190) NOT NULL,
+                house_number VARCHAR(40) NOT NULL,
+                postal_code VARCHAR(16) NOT NULL,
+                city VARCHAR(120) NOT NULL,
+                state_code VARCHAR(8) NOT NULL,
+                latitude DECIMAL(10,7) NULL,
+                longitude DECIMAL(10,7) NULL,
+                parking_available VARCHAR(16) NOT NULL,
+                indoor_room_available VARCHAR(16) NOT NULL,
+                bad_weather_option_available VARCHAR(16) NOT NULL,
+                electricity_available VARCHAR(16) NOT NULL,
+                water_available VARCHAR(16) NOT NULL,
+                accessibility_notes TEXT NULL,
+                group_notes TEXT NULL,
+                general_notes TEXT NULL,
+                privacy_consent TINYINT(1) NOT NULL DEFAULT 0,
+                privacy_consent_at DATETIME NULL,
+                route_distance_km DECIMAL(10,2) NULL,
+                route_cost DECIMAL(10,2) NULL,
+                confirmation_mail_sent TINYINT(1) NOT NULL DEFAULT 0,
+                confirmation_mail_error TEXT NULL,
+                confirmation_mail_attempted_at DATETIME NULL,
+                internal_note TEXT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                proposal_sent_at DATETIME NULL,
+                confirmed_at DATETIME NULL,
+                closed_at DATETIME NULL,
+                PRIMARY KEY  (id),
+                UNIQUE KEY public_uuid (public_uuid),
+                KEY main_status (main_status),
+                KEY work_state (work_state),
+                KEY request_mode (request_mode),
+                KEY specific_requested_date (specific_requested_date),
+                KEY postal_code (postal_code),
+                KEY state_code (state_code),
+                KEY created_at (created_at)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_request_classes (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                request_id BIGINT UNSIGNED NOT NULL,
+                class_name VARCHAR(80) NOT NULL,
+                grade TINYINT UNSIGNED NOT NULL,
+                participant_count INT UNSIGNED NOT NULL,
+                sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                KEY request_id (request_id)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_calendar_days (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                calendar_date DATE NOT NULL,
+                availability_state VARCHAR(32) NOT NULL DEFAULT 'available',
+                internal_note TEXT NULL,
+                public_note VARCHAR(255) NULL,
+                custom_start_label VARCHAR(190) NULL,
+                custom_start_latitude DECIMAL(10,7) NULL,
+                custom_start_longitude DECIMAL(10,7) NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE KEY calendar_date (calendar_date),
+                KEY availability_state (availability_state)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_appointments (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                request_id BIGINT UNSIGNED NULL,
+                appointment_date DATE NOT NULL,
+                public_city VARCHAR(120) NOT NULL,
+                institution_name VARCHAR(255) NOT NULL,
+                contact_name VARCHAR(190) NOT NULL,
+                contact_email VARCHAR(190) NOT NULL,
+                contact_phone VARCHAR(80) NOT NULL,
+                street VARCHAR(190) NOT NULL,
+                house_number VARCHAR(40) NOT NULL,
+                postal_code VARCHAR(16) NOT NULL,
+                city VARCHAR(120) NOT NULL,
+                state_code VARCHAR(8) NOT NULL,
+                latitude DECIMAL(10,7) NULL,
+                longitude DECIMAL(10,7) NULL,
+                start_label VARCHAR(190) NULL,
+                start_latitude DECIMAL(10,7) NULL,
+                start_longitude DECIMAL(10,7) NULL,
+                route_distance_km DECIMAL(10,2) NULL,
+                route_cost DECIMAL(10,2) NULL,
+                internal_notes TEXT NULL,
+                calendar_exported_at DATETIME NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE KEY appointment_date (appointment_date),
+                KEY request_id (request_id),
+                KEY state_code (state_code)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_suggestions (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                request_id BIGINT UNSIGNED NOT NULL,
+                suggestion_date DATE NOT NULL,
+                suggestion_type VARCHAR(40) NOT NULL,
+                sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+                state VARCHAR(32) NOT NULL DEFAULT 'pending',
+                score DECIMAL(10,4) NULL,
+                estimated_distance_km DECIMAL(10,2) NULL,
+                estimated_cost DECIMAL(10,2) NULL,
+                reason_codes LONGTEXT NULL,
+                reason_summary VARCHAR(255) NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                KEY request_id (request_id),
+                KEY suggestion_date (suggestion_date),
+                KEY state (state)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_states (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                state_code VARCHAR(8) NOT NULL,
+                state_name VARCHAR(120) NOT NULL,
+                is_active TINYINT(1) NOT NULL DEFAULT 0,
+                sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE KEY state_code (state_code),
+                KEY is_active (is_active),
+                KEY sort_order (sort_order)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_route_cache (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                cache_key VARCHAR(190) NOT NULL,
+                provider VARCHAR(80) NOT NULL,
+                request_type VARCHAR(40) NOT NULL,
+                request_payload_hash VARCHAR(128) NOT NULL,
+                response_payload LONGTEXT NOT NULL,
+                expires_at DATETIME NOT NULL,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE KEY cache_key (cache_key),
+                KEY expires_at (expires_at),
+                KEY provider_type (provider, request_type)
+            ) {$charset};",
+        ];
+    }
+}

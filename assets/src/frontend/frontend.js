@@ -1,0 +1,1 @@
+import '../../dist/frontend.js';

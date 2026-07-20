@@ -1,0 +1,41 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "meta": {
+    "title": "Pro Ocean Ocean Van MVP",
+    "author": "Pro Ocean",
+    "description": "Öffentliche MVP-Demo der Buchungs- und Tourenplanung für den Ocean Van"
+  },
+  "landingPage": "/",
+  "login": true,
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "latest"
+  },
+  "features": {
+    "networking": true
+  },
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "git:directory",
+        "url": "__REPOSITORY_URL__",
+        "ref": "HEAD",
+        "refType": "refname"
+      },
+      "options": {
+        "activate": true
+      }
+    },
+    {
+      "step": "writeFile",
+      "path": "/wordpress/wp-content/mu-plugins/pro-ocean-mvp.php",
+      "data": "<?php\n/** MVP-Schutz: Keine E-Mails aus der temporären Demo versenden. */\nadd_filter('pre_wp_mail', '__return_true');\n"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php\nrequire_once '/wordpress/wp-load.php';\n\nupdate_option('blogname', 'Pro Ocean · Ocean Van MVP');\nupdate_option('blogdescription', 'Buchung und routenoptimierte Tourenplanung');\nupdate_option('timezone_string', 'Europe/Berlin');\nupdate_option('admin_email', 'demo@proocean.example');\nupdate_option('pov_email_sender_address', 'demo@proocean.example');\nupdate_option('pov_team_notification_emails', 'demo@proocean.example');\n\n\\ProOceanVan\\Activation::enableTestProfile(true);\n$states = [];\nforeach ((new \\ProOceanVan\\Repository\\StateRepository())->all() as $state) {\n    $states[(string) $state['state_code']] = [\n        'is_active' => 1,\n        'sort_order' => (int) $state['sort_order'],\n    ];\n}\n(new \\ProOceanVan\\Repository\\StateRepository())->updateStates($states);\n(new \\ProOceanVan\\Service\\DemoDataService())->seed();\n\n$page = get_page_by_path('ocean-van-demo');\n$pageId = $page instanceof WP_Post ? (int) $page->ID : wp_insert_post([\n    'post_title' => 'Hol dir das Meer zu dir',\n    'post_name' => 'ocean-van-demo',\n    'post_type' => 'page',\n    'post_status' => 'publish',\n    'post_content' => '[pro_ocean_van_booking]',\n]);\nif ($pageId && ! is_wp_error($pageId)) {\n    update_option('show_on_front', 'page');\n    update_option('page_on_front', (int) $pageId);\n}\n"
+    }
+  ]
+}
+

@@ -1,0 +1,12 @@
+{
+  "name": "pro-ocean-van",
+  "version": "0.5.1",
+  "private": true,
+  "scripts": {
+    "build": "echo Assets are committed in assets/dist",
+    "build:zip": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Set-Location ..; Compress-Archive -Path pro-ocean-van -DestinationPath pro-ocean-van.zip -Force\"",
+    "test": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/run-static.ps1",
+    "test:phpunit": "echo Run PHPUnit in a WordPress test environment"
+  },
+  "devDependencies": {}
+}

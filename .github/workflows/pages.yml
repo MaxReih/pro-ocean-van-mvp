@@ -1,0 +1,51 @@
+name: MVP-Demo veröffentlichen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v6
+
+      - name: GitHub Pages vorbereiten
+        uses: actions/configure-pages@v5
+
+      - name: Demo erstellen
+        shell: bash
+        run: |
+          mkdir -p _site
+          repository_url="https://github.com/${GITHUB_REPOSITORY}"
+          sed "s|__REPOSITORY_URL__|${repository_url}|g" playground/blueprint.template.json > _site/blueprint.json
+          cp playground/index.html _site/index.html
+          cp assets/brand/pro-ocean-symbol-blue.svg _site/pro-ocean-symbol-blue.svg
+
+      - name: Demo-Artefakt hochladen
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: GitHub Pages veröffentlichen
+        id: deployment
+        uses: actions/deploy-pages@v4
+
