@@ -35,7 +35,10 @@ final class OperationsPortal
         add_filter('wp_robots', [$this, 'robots']);
         add_filter('wp_sitemaps_posts_query_args', [$this, 'excludeFromSitemap'], 10, 2);
         add_filter('wp_list_pages_excludes', [$this, 'excludeFromPageLists']);
+        add_filter('get_pages_query_args', [$this, 'excludeFromPageQueries'], 10, 2);
         add_filter('wp_nav_menu_objects', [$this, 'excludeFromMenus']);
+        add_filter('render_block_core/navigation-link', [$this, 'excludeNavigationBlock'], 10, 2);
+        add_filter('render_block_core/navigation-submenu', [$this, 'excludeNavigationBlock'], 10, 2);
         add_action('pre_get_posts', [$this, 'excludeFromSearch']);
         add_action('login_enqueue_scripts', [$this, 'loginBranding']);
         add_filter('login_headerurl', static fn (): string => home_url('/'));
@@ -53,6 +56,7 @@ final class OperationsPortal
         if (! $owned) {
             $page = null;
             $pageId = 0;
+            delete_option(self::PAGE_OPTION);
         }
 
         if ($pageId <= 0) {
@@ -83,7 +87,7 @@ final class OperationsPortal
 
     public static function url(string $page = 'pov-requests', array $args = []): string
     {
-        $pageId = (int) get_option(self::PAGE_OPTION, 0);
+        $pageId = self::ownedPageId();
         $base = $pageId > 0 ? get_permalink($pageId) : home_url('/' . self::SLUG . '/');
         if (! is_string($base) || $base === '') {
             $base = home_url('/' . self::SLUG . '/');
@@ -116,10 +120,8 @@ final class OperationsPortal
 
     public static function isPortalRequest(): bool
     {
-        $pageId = (int) get_option(self::PAGE_OPTION, 0);
-        return $pageId > 0
-            && get_post_meta($pageId, '_pov_operations_portal', true) === '1'
-            && is_page($pageId);
+        $pageId = self::ownedPageId();
+        return $pageId > 0 && is_page($pageId);
     }
 
     public function protect(): void
@@ -253,7 +255,7 @@ final class OperationsPortal
 
     public function excludeFromSitemap(array $args, string $postType): array
     {
-        $pageId = (int) get_option(self::PAGE_OPTION, 0);
+        $pageId = self::ownedPageId();
         if ($postType === 'page' && $pageId > 0) {
             $args['post__not_in'] = array_values(array_unique(array_merge((array) ($args['post__not_in'] ?? []), [$pageId])));
         }
@@ -262,17 +264,47 @@ final class OperationsPortal
 
     public function excludeFromPageLists(array $excluded): array
     {
-        $pageId = (int) get_option(self::PAGE_OPTION, 0);
+        $pageId = self::ownedPageId();
         return $pageId > 0 ? array_values(array_unique(array_merge($excluded, [$pageId]))) : $excluded;
+    }
+
+    public function excludeFromPageQueries(array $queryArgs, array $parsedArgs): array
+    {
+        $pageId = self::ownedPageId();
+        if (is_admin() || ($parsedArgs['post_type'] ?? 'page') !== 'page' || $pageId <= 0) {
+            return $queryArgs;
+        }
+
+        $queryArgs['post__not_in'] = array_values(array_unique(array_merge(
+            (array) ($queryArgs['post__not_in'] ?? []),
+            [$pageId]
+        )));
+        return $queryArgs;
     }
 
     public function excludeFromMenus(array $items): array
     {
-        $pageId = (int) get_option(self::PAGE_OPTION, 0);
+        $pageId = self::ownedPageId();
         if ($pageId <= 0) {
             return $items;
         }
         return array_values(array_filter($items, static fn (mixed $item): bool => (int) ($item->object_id ?? 0) !== $pageId));
+    }
+
+    public function excludeNavigationBlock(string $content, array $block): string
+    {
+        if (is_admin()) {
+            return $content;
+        }
+
+        $pageId = self::ownedPageId();
+        $attributes = (array) ($block['attrs'] ?? []);
+        $linkedPageId = (int) ($attributes['id'] ?? 0);
+        $linkedUrl = (string) ($attributes['url'] ?? '');
+        if (($pageId > 0 && $linkedPageId === $pageId) || ($linkedUrl !== '' && self::isPortalUrl($linkedUrl))) {
+            return '';
+        }
+        return $content;
     }
 
     public function excludeFromSearch(WP_Query $query): void
@@ -280,7 +312,7 @@ final class OperationsPortal
         if (is_admin() || ! $query->is_main_query() || ! $query->is_search()) {
             return;
         }
-        $pageId = (int) get_option(self::PAGE_OPTION, 0);
+        $pageId = self::ownedPageId();
         if ($pageId > 0) {
             $query->set('post__not_in', array_values(array_unique(array_merge((array) $query->get('post__not_in'), [$pageId]))));
         }
@@ -328,5 +360,17 @@ final class OperationsPortal
             }
         }
         return null;
+    }
+
+    private static function ownedPageId(): int
+    {
+        $pageId = (int) get_option(self::PAGE_OPTION, 0);
+        $page = $pageId > 0 ? get_post($pageId) : null;
+        return $page instanceof WP_Post
+            && $page->post_type === 'page'
+            && $page->post_status !== 'trash'
+            && get_post_meta($pageId, '_pov_operations_portal', true) === '1'
+            ? $pageId
+            : 0;
     }
 }

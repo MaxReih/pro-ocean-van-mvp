@@ -8,7 +8,7 @@ body.pov-portal-body {
   line-height: 1.5;
 }
 .pov-portal-body #wpadminbar { display: none !important; }
-.pov-portal-body .pov-portal-shell { width: 100%; padding: 18px clamp(14px, 2vw, 30px) 48px; }
+.pov-portal-body .pov-portal-shell { box-sizing: border-box; width: 100%; padding: 18px clamp(14px, 2vw, 30px) 48px; }
 .pov-portal-body .pov-admin { width: min(1480px, 100%); max-width: none; margin: 0 auto; }
 .pov-portal-body .pov-admin-header { top: 12px; }
 .pov-portal-body .pov-admin-title { margin-top: 0; }

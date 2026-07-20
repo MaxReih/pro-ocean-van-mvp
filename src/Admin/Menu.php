@@ -1370,6 +1370,12 @@ final class Menu
             echo '<div class="notice notice-success inline"><p>' . esc_html((string) $days) . ' Kalendertage gespeichert.</p></div>';
         }
 
+        if (get_option('pov_demo_mode', '0') === '1'
+            && get_option('pov_geocoding_provider') === 'demo'
+            && get_option('pov_routing_provider') === 'null') {
+            return;
+        }
+
         if (Activation::isTestProfileActive()) {
             echo '<div class="notice notice-info inline"><p>Testmodus aktiv – öffentliche OSM-Dienste sind nicht für den Live-Betrieb gedacht.</p></div>';
             return;

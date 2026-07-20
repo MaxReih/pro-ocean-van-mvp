@@ -31,7 +31,7 @@ socket.addEventListener('message', (event) => {
     pending.delete(payload.id);
     payload.error ? handler.reject(new Error(payload.error.message)) : handler.resolve(payload.result);
   } else if (payload.method === 'Runtime.exceptionThrown') {
-    errors.push(payload.params?.exceptionDetails?.text || 'JavaScript exception');
+    errors.push(payload.params?.exceptionDetails?.exception?.description || payload.params?.exceptionDetails?.text || 'JavaScript exception');
   }
 });
 
@@ -78,6 +78,7 @@ const routeAudit = await evaluate(`(() => ({
   path: location.pathname,
   view: new URL(location.href).searchParams.get('view'),
   robots: document.querySelector('meta[name=robots]')?.content,
+  pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
   personalSession: Boolean(document.querySelector('.pov-admin-usernav span') && document.querySelector('.pov-admin-usernav a[href*=logout]')),
   clusters: document.querySelectorAll('.pov-route-cluster').length,
   routeLegs: document.querySelectorAll('.pov-tour-leg').length,
@@ -212,6 +213,5 @@ const guestAudit = await evaluate(`(() => ({
   loginForm: Boolean(document.querySelector('#loginform')),
   redirectedFromPortal: new URL(location.href).searchParams.get('redirect_to')?.includes('/van-operations/') || false,
 }))()`);
-await command('Browser.close').catch(() => {});
-socket.close();
 process.stdout.write(JSON.stringify({ routeAudit, legacyAdminAudit, addressAudit, statisticsAudit, calendarAudit, inboxAudit, detailAudit, mobileAudit, settingsAudit, guestAudit, errors }, null, 2) + '\n');
+socket.close();

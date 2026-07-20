@@ -38,7 +38,7 @@ socket.addEventListener('message', (event) => {
     contexts.clear();
   }
   if (payload.method === 'Runtime.exceptionThrown') {
-    errors.push(payload.params?.exceptionDetails?.text || 'JavaScript exception');
+    errors.push(payload.params?.exceptionDetails?.exception?.description || payload.params?.exceptionDetails?.text || 'JavaScript exception');
   }
 });
 
@@ -89,6 +89,9 @@ async function waitForSurface(selector, timeoutMs = 120000) {
           title: document.title,
           heading: document.querySelector('h1, .pov-admin-title h1')?.textContent.trim() || '',
           requests: document.querySelectorAll('.pov-operations-table tbody tr').length,
+          pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          portalLinks: document.querySelectorAll('a[href*="/van-operations/"]').length,
+          setupWarnings: [...document.querySelectorAll('.notice-warning')].map((node) => node.textContent.trim()),
         }))()`, contextId);
         if (result?.found) return result;
       } catch {}
@@ -127,7 +130,7 @@ await command('Network.clearBrowserCache');
 await command('Network.clearBrowserCookies');
 socket.close();
 
-if (!frontendAudit || !backendAudit) {
+if (!frontendAudit || !backendAudit || frontendAudit.portalLinks > 0 || backendAudit.pageOverflow || backendAudit.setupWarnings.length > 0) {
   throw new Error('Die öffentliche WordPress-Demo wurde nicht vollständig geladen.');
 }
 
