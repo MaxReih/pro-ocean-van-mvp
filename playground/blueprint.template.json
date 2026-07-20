@@ -6,7 +6,6 @@
     "description": "Öffentliche MVP-Demo der Buchungs- und Tourenplanung für den Ocean Van"
   },
   "landingPage": "/",
-  "login": false,
   "preferredVersions": {
     "php": "8.3",
     "wp": "latest"

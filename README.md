@@ -15,7 +15,7 @@ Das Repository enthält eine öffentliche, temporäre WordPress-Demo für Teampr
 - Keine Installation und kein manuelles Login für Testende erforderlich
 - Netzwerkunabhängige PLZ- und Routenprüfung in der Präsentationsdemo
 
-Der erste Start der Buchung dauert in der Regel nur noch wenige Sekunden. Jede Person erhält eine eigene temporäre Demo-Instanz im Browser.
+Der einmalige WordPress-Start kann je nach Gerät und Verbindung etwas dauern; die anschließende PLZ- und Routensuche antwortet ohne externe Geo-Wartezeit. Jede Person erhält eine eigene temporäre Demo-Instanz im Browser.
 
 ## Funktionsumfang
 

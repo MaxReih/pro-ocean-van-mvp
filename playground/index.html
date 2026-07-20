@@ -89,7 +89,11 @@
         links.forEach((link) => {
           const configured = structuredClone(blueprint);
           const isBackend = link.dataset.demo === 'backend';
-          configured.login = isBackend;
+          if (isBackend) {
+            configured.login = true;
+          } else {
+            delete configured.login;
+          }
           configured.landingPage = isBackend
             ? '/wp-admin/admin.php?page=pov-requests'
             : '/';
@@ -97,7 +101,7 @@
           const bytes = new TextEncoder().encode(json);
           let binary = '';
           bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-          link.href = `https://playground.wordpress.net/#${btoa(binary)}`;
+          link.href = `https://playground.wordpress.net/?mode=seamless#${btoa(binary)}`;
           link.removeAttribute('aria-disabled');
         });
         status.textContent = 'Bereit. Die Buchung startet ohne externe Geo-Dienste.';
