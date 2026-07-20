@@ -37,6 +37,7 @@ final class Assets
             'restUrl' => esc_url_raw(rest_url('pro-ocean-van/v1/')),
             'states' => [],
             'privacyUrl' => esc_url_raw((string) get_option('pov_privacy_page_url', '')),
+            'requestTimeoutMs' => 12000,
         ]);
 
         if ($this->shouldLoad || is_admin()) {

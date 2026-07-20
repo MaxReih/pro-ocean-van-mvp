@@ -28,8 +28,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site
-          repository_url="https://github.com/${GITHUB_REPOSITORY}"
-          sed "s|__REPOSITORY_URL__|${repository_url}|g" playground/blueprint.template.json > _site/blueprint.json
+          cp playground/blueprint.template.json _site/blueprint.json
           cp playground/index.html _site/index.html
           cp assets/brand/pro-ocean-symbol-blue.svg _site/pro-ocean-symbol-blue.svg
 
@@ -48,4 +47,3 @@ jobs:
       - name: GitHub Pages veröffentlichen
         id: deployment
         uses: actions/deploy-pages@v4
-

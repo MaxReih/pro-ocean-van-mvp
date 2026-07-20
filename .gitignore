@@ -3,7 +3,7 @@ Thumbs.db
 .idea/
 .vscode/
 node_modules/
-vendor/
+/vendor/
 coverage/
 artifacts/
 *.log
@@ -11,4 +11,3 @@ artifacts/
 .env
 .env.*
 !.env.example
-

@@ -48,7 +48,7 @@ final class NominatimGeocodingProvider implements GeocodingProviderInterface
         ], trailingslashit($this->baseUrl) . 'search');
 
         $response = wp_remote_get($url, [
-            'timeout' => 8,
+            'timeout' => 5,
             'redirection' => 2,
             'user-agent' => 'ProOceanVan/' . POV_VERSION . '; ' . home_url(),
         ]);

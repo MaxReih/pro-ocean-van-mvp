@@ -3,6 +3,7 @@
   if (!root || !window.POV_BOOKING || !window.POVCalendar) return;
 
   const api = window.POV_BOOKING.restUrl;
+  const requestTimeoutMs = Math.max(5000, Number(window.POV_BOOKING.requestTimeoutMs || 12000));
   const $ = function (selector, context) {
     return (context || root).querySelector(selector);
   };
@@ -237,7 +238,13 @@
     const requestId = state.routeRequestId + 1;
     state.routeRequestId = requestId;
     if (routeController) routeController.abort();
-    routeController = new AbortController();
+    const requestController = new AbortController();
+    let requestTimedOut = false;
+    const requestTimeout = window.setTimeout(function () {
+      requestTimedOut = true;
+      requestController.abort();
+    }, requestTimeoutMs);
+    routeController = requestController;
 
     setRouteLoading(true);
     setRouteStatus('Passende Termine werden berechnet …', 'loading');
@@ -248,7 +255,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postal_code: values.postal, state_code: values.code }),
-        signal: routeController.signal
+        signal: requestController.signal
       });
       const data = await responseData(response);
       if (!response.ok) {
@@ -265,16 +272,19 @@
       renderSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
       setRouteStatus('Route geprüft.', 'success');
     } catch (error) {
-      if (error.name === 'AbortError' || requestId !== state.routeRequestId || routeRegionKey() !== key) return;
+      if ((error.name === 'AbortError' && !requestTimedOut) || requestId !== state.routeRequestId || routeRegionKey() !== key) return;
       state.activeRegionKey = key;
       copyRouteRegionToForm();
       markRouteFresh();
       renderSuggestionPlaceholder('Keine Routentermine geladen', 'Kalender oder Zeitraum sind weiterhin möglich.', 'warning');
-      setRouteStatus((error.isApiError ? error.message + ' ' : '') + 'Bitte Kalender oder Zeitraum nutzen.', 'error');
+      setRouteStatus(requestTimedOut
+        ? 'Die Routensuche dauert zu lange. Bitte Kalender oder Zeitraum nutzen.'
+        : (error.isApiError ? error.message + ' ' : '') + 'Bitte Kalender oder Zeitraum nutzen.', 'error');
     } finally {
+      window.clearTimeout(requestTimeout);
       if (requestId === state.routeRequestId) {
         setRouteLoading(false);
-        routeController = null;
+        if (routeController === requestController) routeController = null;
       }
     }
   }

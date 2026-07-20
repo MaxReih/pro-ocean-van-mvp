@@ -119,7 +119,7 @@ final class OsrmRoutingProvider implements RoutingProviderInterface
     private function httpArgs(): array
     {
         return [
-            'timeout' => 8,
+            'timeout' => 5,
             'redirection' => 2,
             'user-agent' => 'ProOceanVan/' . POV_VERSION . '; ' . home_url(),
         ];

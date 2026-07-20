@@ -31,6 +31,16 @@ final class PostalCodeService
             return ['ok' => false, 'error' => 'Bundesland nicht gefunden.'];
         }
 
+        if (function_exists('get_option') && get_option('pov_geocoding_provider') === 'demo') {
+            return [
+                'ok' => true,
+                'postal_code' => $postalCode,
+                'city' => $this->demoCity($postalCode),
+                'state_code' => $stateCode,
+                'state_name' => $stateName,
+            ];
+        }
+
         $payload = ['postal_code' => $postalCode, 'state_code' => $stateCode];
         $cache = new RouteCacheRepository();
         $cached = $cache->get('openplzapi:v1', 'postal_code', $payload);
@@ -44,7 +54,7 @@ final class PostalCodeService
             'pageSize' => 20,
         ], self::BASE_URL . 'Localities');
         $response = wp_remote_get($url, [
-            'timeout' => 8,
+            'timeout' => 4,
             'redirection' => 2,
             'sslverify' => ! (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local'),
             'headers' => ['Accept' => 'application/json'],
@@ -99,5 +109,19 @@ final class PostalCodeService
             }
         }
         return '';
+    }
+
+    private function demoCity(string $postalCode): string
+    {
+        return [
+            '48143' => 'Münster',
+            '54290' => 'Trier',
+            '66111' => 'Saarbrücken',
+            '70178' => 'Stuttgart',
+            '72072' => 'Tübingen',
+            '73312' => 'Geislingen an der Steige',
+            '90403' => 'Nürnberg',
+            '96047' => 'Bamberg',
+        ][$postalCode] ?? 'Einsatzort ' . $postalCode;
     }
 }

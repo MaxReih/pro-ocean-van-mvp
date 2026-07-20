@@ -88,7 +88,9 @@
       .then((blueprint) => {
         links.forEach((link) => {
           const configured = structuredClone(blueprint);
-          configured.landingPage = link.dataset.demo === 'backend'
+          const isBackend = link.dataset.demo === 'backend';
+          configured.login = isBackend;
+          configured.landingPage = isBackend
             ? '/wp-admin/admin.php?page=pov-requests'
             : '/';
           const json = JSON.stringify(configured);
@@ -98,7 +100,7 @@
           link.href = `https://playground.wordpress.net/#${btoa(binary)}`;
           link.removeAttribute('aria-disabled');
         });
-        status.textContent = 'Bereit. Der erste Start dauert etwa eine Minute.';
+        status.textContent = 'Bereit. Die Buchung startet ohne externe Geo-Dienste.';
       })
       .catch(() => {
         status.textContent = 'Die Demo konnte nicht vorbereitet werden. Bitte Seite neu laden.';
@@ -106,4 +108,3 @@
   </script>
 </body>
 </html>
-

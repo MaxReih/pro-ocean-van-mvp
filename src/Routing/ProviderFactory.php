@@ -23,6 +23,9 @@ final class ProviderFactory
 
     public function geocoding(): GeocodingProviderInterface
     {
+        if (get_option('pov_geocoding_provider') === 'demo') {
+            return new DemoGeocodingProvider();
+        }
         if (get_option('pov_geocoding_provider') === 'heigit' && (string) get_option('pov_heigit_api_key') !== '') {
             return new PeliasGeocodingProvider(
                 'https://api.heigit.org/pelias/v1/',

@@ -1,0 +1,24 @@
+.pov-mini-map {
+  position: relative;
+  min-height: 180px;
+  margin-top: 12px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #F6F3EE;
+}
+
+.pov-mini-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pov-map-attribution {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, .86);
+  color: #0B1B1F;
+}
