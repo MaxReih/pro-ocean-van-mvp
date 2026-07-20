@@ -6,13 +6,15 @@ Installierbares WordPress-Plugin für die öffentliche Ocean-Van-Buchung und die
 
 Das Repository enthält eine öffentliche, temporäre WordPress-Demo für Teampräsentationen. GitHub Pages stellt die Startseite bereit; WordPress Playground startet daraus eine frische WordPress-Instanz direkt im Browser.
 
+**[Öffentliche Team-Demo starten](https://maxreih.github.io/pro-ocean-van-mvp/)**
+
 - Öffentliche Buchungsoberfläche und Team-Cockpit
 - Dynamisch datierte Beispielanfragen und bestätigte Termine
 - Keine realen Kontaktdaten
 - Mailversand in der Demo deaktiviert
 - Keine Installation und kein Login für Testende erforderlich
 
-Nach Veröffentlichung steht die Demo unter `https://GITHUB-NAME.github.io/REPOSITORY/` bereit.
+Der erste Start kann ungefähr eine Minute dauern. Jede Person erhält eine eigene temporäre Demo-Instanz im Browser.
 
 ## Funktionsumfang
 
