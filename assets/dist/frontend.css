@@ -5,6 +5,9 @@
   --pov-red: #D24646;
   --pov-sand: #F5DBA2;
   --pov-blue: #135476;
+  --pov-green: #1F5C4B;
+  --pov-mint: #E4F3EA;
+  --pov-walk-in: #E9823A;
   --pov-white: #fff;
   --pov-radius-sm: 10px;
   --pov-radius: 16px;
@@ -660,9 +663,9 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
 }
 
 .pov-day[data-state="available"] {
-  color: var(--pov-blue);
-  background: var(--pov-ice);
-  border-color: var(--pov-blue);
+  color: var(--pov-green);
+  background: var(--pov-mint);
+  border-color: rgba(31, 92, 75, .48);
 }
 
 .pov-day[data-state="limited"] {
@@ -675,6 +678,19 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
   color: var(--pov-white);
   background: var(--pov-blue);
   border-color: var(--pov-blue);
+}
+
+.pov-day[data-state="walk_in"] {
+  color: #fff;
+  background: var(--pov-walk-in);
+  border-color: var(--pov-walk-in);
+  cursor: pointer;
+}
+
+.pov-day[data-state="geo_unavailable"] {
+  color: #6d7d84;
+  background: #edf1f2;
+  border-color: #d3dde0;
 }
 
 .pov-day[data-state="unavailable"] {
@@ -731,7 +747,8 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
 }
 
 .pov-legend .is-available {
-  background: var(--pov-ice);
+  background: var(--pov-mint);
+  border-color: var(--pov-green);
 }
 
 .pov-legend .is-limited {
@@ -743,9 +760,53 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
   background: var(--pov-blue);
 }
 
+.pov-legend .is-walk-in {
+  background: var(--pov-walk-in);
+  border-color: var(--pov-walk-in);
+}
+
 .pov-legend .is-unavailable {
   background: var(--pov-white);
   border-color: var(--pov-red);
+}
+
+.pov-walk-in-dialog {
+  width: min(540px, calc(100% - 28px));
+  padding: 30px;
+  color: var(--pov-ink);
+  background: var(--pov-white);
+  border: 0;
+  border-radius: var(--pov-radius-lg);
+  box-shadow: 0 28px 90px rgba(0, 56, 82, .28);
+}
+
+.pov-walk-in-dialog::backdrop {
+  background: rgba(0, 56, 82, .58);
+  backdrop-filter: blur(3px);
+}
+
+.pov-walk-in-dialog h2 {
+  margin: 8px 36px 8px 0;
+}
+
+.pov-walk-in-dialog .pov-walk-in-date,
+.pov-walk-in-dialog .pov-walk-in-location {
+  font-weight: 750;
+}
+
+.pov-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  color: var(--pov-blue);
+  background: var(--pov-ice);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.45rem;
 }
 
 .pov-form {

@@ -7,6 +7,7 @@ namespace ProOceanVan\Repository;
 use ProOceanVan\Domain\RequestStatus;
 use ProOceanVan\Domain\SuggestionState;
 use ProOceanVan\Domain\WorkState;
+use ProOceanVan\Service\AttachmentService;
 
 final class RequestRepository
 {
@@ -18,6 +19,9 @@ final class RequestRepository
         $mode = $mode === 'specific_date' ? 'specific_date' : 'date_range';
         $now = current_time('mysql');
         $uuid = $this->newPublicUuid();
+        $children = max(0, (int) ($payload['children_count'] ?? 0));
+        $adults = max(0, (int) ($payload['adult_count'] ?? 0));
+        $participantTotal = max($children + $adults, (int) ($payload['participant_total'] ?? 0));
 
         $inserted = $wpdb->insert($table, [
             'public_uuid' => $uuid,
@@ -33,6 +37,9 @@ final class RequestRepository
             ))),
             'institution_name' => sanitize_text_field((string) ($payload['institution_name'] ?? '')),
             'institution_type' => sanitize_text_field((string) ($payload['institution_type'] ?? '')),
+            'children_count' => $children,
+            'adult_count' => $adults,
+            'participant_total' => $participantTotal,
             'contact_first_name' => sanitize_text_field((string) ($payload['contact_first_name'] ?? '')),
             'contact_last_name' => sanitize_text_field((string) ($payload['contact_last_name'] ?? '')),
             'contact_email' => sanitize_email((string) ($payload['contact_email'] ?? '')),
@@ -77,7 +84,10 @@ final class RequestRepository
             return null;
         }
         $row['classes'] = (new ClassRepository())->forRequest($id);
-        $row['participant_count'] = (new ClassRepository())->participantCount($id);
+        $classParticipants = (new ClassRepository())->participantCount($id);
+        $row['participant_count'] = (int) ($row['participant_total'] ?? 0) > 0
+            ? (int) $row['participant_total']
+            : $classParticipants;
         return $row;
     }
 
@@ -207,6 +217,64 @@ final class RequestRepository
         return $updated !== false;
     }
 
+    public function updateDetails(int $id, array $data): bool
+    {
+        $request = $this->find($id);
+        if (! $request) {
+            return false;
+        }
+        $mode = ($data['request_mode'] ?? '') === 'specific_date' ? 'specific_date' : 'date_range';
+        $children = max(0, (int) ($data['children_count'] ?? 0));
+        $adults = max(0, (int) ($data['adult_count'] ?? 0));
+        $total = $children + $adults;
+        if ($total <= 0) {
+            return false;
+        }
+        $specific = $mode === 'specific_date' ? $this->dateOrNull($data['specific_requested_date'] ?? null) : null;
+        $from = $mode === 'date_range' ? $this->dateOrNull($data['desired_date_from'] ?? null) : null;
+        $to = $mode === 'date_range' ? $this->dateOrNull($data['desired_date_to'] ?? null) : null;
+        $weekdays = array_values(array_intersect(
+            array_map('sanitize_key', (array) ($data['possible_weekdays'] ?? [])),
+            ['mon', 'tue', 'wed', 'thu', 'fri']
+        ));
+        if (($mode === 'specific_date' && ! $specific)
+            || ($mode === 'date_range' && (! $from || ! $to || $from > $to || ! $weekdays))) {
+            return false;
+        }
+
+        global $wpdb;
+        $updated = $wpdb->update($wpdb->prefix . 'pov_requests', [
+            'request_mode' => $mode,
+            'specific_requested_date' => $specific,
+            'desired_date_from' => $from,
+            'desired_date_to' => $to,
+            'possible_weekdays' => $mode === 'date_range' ? implode(',', $weekdays) : '',
+            'institution_name' => sanitize_text_field((string) ($data['institution_name'] ?? '')),
+            'institution_type' => sanitize_text_field((string) ($data['institution_type'] ?? '')),
+            'children_count' => $children,
+            'adult_count' => $adults,
+            'participant_total' => $total,
+            'contact_first_name' => sanitize_text_field((string) ($data['contact_first_name'] ?? '')),
+            'contact_last_name' => sanitize_text_field((string) ($data['contact_last_name'] ?? '')),
+            'contact_email' => sanitize_email((string) ($data['contact_email'] ?? '')),
+            'contact_phone' => sanitize_text_field((string) ($data['contact_phone'] ?? '')),
+            'general_notes' => sanitize_textarea_field((string) ($data['general_notes'] ?? '')),
+            'parking_available' => $this->availabilityAnswer($data['parking_available'] ?? ''),
+            'indoor_room_available' => $this->availabilityAnswer($data['indoor_room_available'] ?? ''),
+            'bad_weather_option_available' => $this->availabilityAnswer($data['bad_weather_option_available'] ?? ''),
+            'electricity_available' => $this->availabilityAnswer($data['electricity_available'] ?? ''),
+            'water_available' => $this->availabilityAnswer($data['water_available'] ?? ''),
+            'updated_at' => current_time('mysql'),
+        ], ['id' => $id]);
+        if ($updated === false) {
+            return false;
+        }
+        $classes = new ClassRepository();
+        $classes->updateFirstName($id, sanitize_text_field((string) ($data['target_group'] ?? '')));
+        $classes->syncParticipantTotal($id, $total);
+        return true;
+    }
+
     public function updateRoutingData(int $id, array $routing): void
     {
         global $wpdb;
@@ -229,11 +297,18 @@ final class RequestRepository
             'request' => $request,
             'classes' => (new ClassRepository())->forRequest($id),
             'suggestions' => (new SuggestionRepository())->forRequest($id),
+            'appointment' => (new AppointmentRepository())->findForRequest($id),
+            'communications' => (new CommunicationRepository())->forRequest($id),
+            'tour_expenses' => (new TourExpenseRepository())->forRequest($id),
         ];
     }
 
     public function anonymize(int $id): void
     {
+        $attachmentIds = [];
+        foreach ((new CommunicationRepository())->forRequest($id) as $communication) {
+            $attachmentIds = array_merge($attachmentIds, (array) ($communication['attachment_ids'] ?? []));
+        }
         global $wpdb;
         $wpdb->update($wpdb->prefix . 'pov_requests', [
             'institution_name' => 'Anonymisiert',
@@ -250,6 +325,35 @@ final class RequestRepository
             'updated_at' => current_time('mysql'),
             'closed_at' => current_time('mysql'),
         ], ['id' => $id]);
+        $wpdb->update($wpdb->prefix . 'pov_appointments', [
+            'institution_name' => 'Anonymisiert',
+            'contact_name' => '',
+            'contact_email' => '',
+            'contact_phone' => '',
+            'street' => '',
+            'house_number' => '',
+            'internal_notes' => '',
+            'cancellation_reason' => '',
+            'updated_at' => current_time('mysql'),
+        ], ['request_id' => $id]);
+        $wpdb->update($wpdb->prefix . 'pov_communications', [
+            'subject' => '',
+            'message' => '[Anonymisiert]',
+            'sender_name' => '',
+            'recipient' => '',
+            'attachment_ids' => '[]',
+        ], ['request_id' => $id]);
+        $expenses = $wpdb->prefix . 'pov_tour_expenses';
+        $appointments = $wpdb->prefix . 'pov_appointments';
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$expenses} e
+             LEFT JOIN {$appointments} a ON a.id = e.appointment_id
+             SET e.place = '', e.note = ''
+             WHERE e.request_id = %d OR a.request_id = %d",
+            $id,
+            $id
+        ));
+        (new AttachmentService())->deleteRequestFiles($id, $attachmentIds);
     }
 
     private function newPublicUuid(): string
@@ -260,7 +364,10 @@ final class RequestRepository
     private function dateOrNull(mixed $value): ?string
     {
         $value = sanitize_text_field((string) $value);
-        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : null;
+        if (! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $parts)) {
+            return null;
+        }
+        return checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]) ? $value : null;
     }
 
     private function coordinateOrNull(mixed $value, float $min, float $max): ?float

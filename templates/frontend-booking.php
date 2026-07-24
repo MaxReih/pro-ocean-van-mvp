@@ -58,11 +58,10 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
             </section>
 
             <div class="pov-route-alternatives" aria-label="Weitere Terminoptionen">
-                <button type="button" class="pov-secondary-button" data-action="toggle-calendar" aria-expanded="false" aria-controls="pov-calendar-panel">Kalender öffnen</button>
                 <button type="button" class="pov-secondary-button" data-action="toggle-range" aria-expanded="false" aria-controls="pov-range-panel">Zeitraum anfragen</button>
             </div>
 
-            <section class="pov-option-panel" id="pov-calendar-panel" data-role="calendar-panel" aria-labelledby="pov-calendar-title" hidden>
+            <section class="pov-option-panel" id="pov-calendar-panel" data-role="calendar-panel" aria-labelledby="pov-calendar-title">
                 <div class="pov-calendar-toolbar">
                     <button type="button" class="pov-icon-button" data-action="prev-month" aria-label="Vorheriger Monat">‹</button>
                     <h3 id="pov-calendar-title" data-role="month-label" tabindex="-1"></h3>
@@ -74,6 +73,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     <span><i class="is-available"></i>Buchbar</span>
                     <span><i class="is-limited"></i>Auf Anfrage</span>
                     <span><i class="is-tour"></i>Van unterwegs</span>
+                    <span><i class="is-walk-in"></i>Einfach vorbeikommen</span>
                     <span><i class="is-unavailable"></i>Nicht buchbar</span>
                 </div>
             </section>
@@ -128,8 +128,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <label>Anfrageart
                     <select name="institution_type" required>
                         <option value="">Bitte auswählen</option>
-                        <option value="Schule">Schule</option>
-                        <option value="Veranstaltung">Veranstaltung</option>
+                        <option value="Schule">Schule (kostenlos)</option>
+                        <option value="Veranstaltung">Veranstaltung (ggf. kostenpflichtig)</option>
                         <option value="Sonstiges">Sonstiges</option>
                     </select>
                 </label>
@@ -165,8 +165,14 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         <?php endforeach; ?>
                     </select>
                 </label>
-                <label>Gesamtteilnehmende
-                    <input type="number" name="participant_total" min="1" step="1" required inputmode="numeric" placeholder="z. B. 28">
+                <label>Kinder und Jugendliche
+                    <input type="number" name="children_count" min="0" max="500" step="1" required inputmode="numeric" value="0">
+                </label>
+                <label>Erwachsene
+                    <input type="number" name="adult_count" min="0" max="500" step="1" required inputmode="numeric" value="0">
+                </label>
+                <label>Personen gesamt
+                    <input type="number" name="participant_total" min="1" max="500" step="1" inputmode="numeric" value="0" readonly>
                 </label>
                 <label>Zielgruppe
                     <select name="target_group" required>
@@ -244,4 +250,14 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
         <p>Wir melden uns per E-Mail.</p>
         <div class="pov-reference"><span>Anfragekennung</span><strong data-role="public-uuid"></strong></div>
     </section>
+
+    <dialog class="pov-walk-in-dialog" data-role="walk-in-dialog" aria-labelledby="pov-walk-in-title">
+        <button type="button" class="pov-dialog-close" data-action="close-walk-in" aria-label="Schließen">×</button>
+        <span class="pov-kicker">Einfach vorbeikommen</span>
+        <h2 id="pov-walk-in-title" data-role="walk-in-title"></h2>
+        <p class="pov-walk-in-date" data-role="walk-in-date"></p>
+        <p data-role="walk-in-description"></p>
+        <p class="pov-walk-in-location" data-role="walk-in-location"></p>
+        <a class="pov-button" data-role="walk-in-link" target="_blank" rel="noopener" hidden>Weitere Informationen</a>
+    </dialog>
 </section>

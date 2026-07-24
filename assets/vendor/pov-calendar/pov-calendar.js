@@ -81,7 +81,7 @@
         button.dataset.state = row.public_state;
         button.dataset.weekend = row.is_weekend ? 'true' : 'false';
         button.dataset.recommended = this.recommended.has(date) ? 'true' : 'false';
-        button.disabled = !row.is_selectable;
+        button.disabled = !row.is_selectable && !row.is_interactive;
         const readableDate = new Intl.DateTimeFormat('de-DE', {
           weekday: 'long',
           day: 'numeric',
@@ -93,7 +93,11 @@
         button.setAttribute('aria-pressed', this.selected === date ? 'true' : 'false');
         button.innerHTML = `<strong>${d}</strong><small>${POVCalendar.escape(row.public_label)}</small>`;
         button.addEventListener('click', () => {
-          if (this.options.onSelect) this.options.onSelect(date, row);
+          if (row.is_interactive && this.options.onDetails) {
+            this.options.onDetails(date, row);
+            return;
+          }
+          if (row.is_selectable && this.options.onSelect) this.options.onSelect(date, row);
         });
         this.element.appendChild(button);
       }

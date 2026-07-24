@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ProOceanVan\Service;
 
 use ProOceanVan\Portal\OperationsPortal;
+use ProOceanVan\Repository\CommunicationRepository;
 use ProOceanVan\Repository\RequestRepository;
 
 final class MailService
@@ -19,22 +20,32 @@ final class MailService
 
         $body = $this->render((string) get_option('pov_confirmation_email_body'), $request, []);
         $subject = (string) get_option('pov_confirmation_email_subject', 'Deine Anfrage für den Ocean Van ist eingegangen');
-        $sent = $this->send((string) $request['contact_email'], $subject, $body);
+        $attachments = (new AttachmentService())->optionIds('pov_confirmation_attachment_ids');
+        $sent = $this->send((string) $request['contact_email'], $subject, $body, [], $attachments);
         $repo->updateMailAttempt($requestId, $sent, $sent ? '' : 'wp_mail returned false');
+        $this->record($request, 'outgoing', 'confirmation', $subject, $body, (string) $request['contact_email'], $attachments, $sent);
 
         return $sent;
     }
 
-    public function sendProposal(array $request, array $suggestions, string $subject = '', string $message = ''): bool
+    public function sendProposal(array $request, array $suggestions, string $subject = '', string $message = '', array $attachmentIds = []): bool
     {
         $subject = $subject !== '' ? $subject : (string) get_option('pov_proposal_email_subject', 'Terminvorschläge für den Ocean Van');
         $message = $message !== '' ? $message : (string) get_option('pov_proposal_email_body', '');
-        return $this->send(
+        $html = $this->renderProposalHtml($message, $request, $suggestions);
+        $attachmentIds = array_values(array_unique(array_merge(
+            (new AttachmentService())->optionIds('pov_proposal_attachment_ids'),
+            array_map('absint', $attachmentIds)
+        )));
+        $sent = $this->send(
             (string) $request['contact_email'],
             $subject,
-            $this->renderProposalHtml($message, $request, $suggestions),
-            ['Content-Type: text/html; charset=UTF-8']
+            $html,
+            ['Content-Type: text/html; charset=UTF-8'],
+            $attachmentIds
         );
+        $this->record($request, 'outgoing', 'proposal', $subject, wp_strip_all_tags($html), (string) $request['contact_email'], $attachmentIds, $sent);
+        return $sent;
     }
 
     public function sendTeamNotification(int $requestId): bool
@@ -66,12 +77,20 @@ final class MailService
         foreach ($recipients as $recipient) {
             $allSent = $this->send($recipient, $subject, $body) && $allSent;
         }
+        $this->record($request, 'system', 'team_notification', $subject, $body, implode(', ', $recipients), [], $allSent);
         return $allSent;
     }
 
-    public function sendResponse(array $request, string $type, string $message, string $date = ''): bool
+    public function sendResponse(
+        array $request,
+        string $type,
+        string $message,
+        string $date = '',
+        string $subject = '',
+        array $attachmentIds = []
+    ): bool
     {
-        if (! in_array($type, ['accept', 'question', 'reject'], true) || ! is_email((string) ($request['contact_email'] ?? ''))) {
+        if (! in_array($type, ['accept', 'question', 'reject', 'message'], true) || ! is_email((string) ($request['contact_email'] ?? ''))) {
             return false;
         }
 
@@ -80,6 +99,7 @@ final class MailService
             'accept' => 'Zusage für den Ocean Van' . ($dateLabel !== '' ? ' · ' . $dateLabel : ''),
             'question' => 'Rückfrage zu deiner Ocean-Van-Anfrage',
             'reject' => 'Deine Ocean-Van-Anfrage',
+            'message' => 'Nachricht zu deiner Ocean-Van-Anfrage',
         ];
         $lines = [
             'Hallo ' . (string) $request['contact_first_name'] . ',',
@@ -95,10 +115,20 @@ final class MailService
         $lines[] = 'Viele Grüße';
         $lines[] = 'Pro Ocean';
 
-        return $this->send((string) $request['contact_email'], $subjects[$type], implode("\n", $lines));
+        $subject = trim($subject) !== '' ? sanitize_text_field($subject) : $subjects[$type];
+        $body = implode("\n", $lines);
+        if (in_array($type, ['accept', 'question', 'reject'], true)) {
+            $attachmentIds = array_values(array_unique(array_merge(
+                (new AttachmentService())->optionIds('pov_' . $type . '_attachment_ids'),
+                array_map('absint', $attachmentIds)
+            )));
+        }
+        $sent = $this->send((string) $request['contact_email'], $subject, $body, [], $attachmentIds);
+        $this->record($request, 'outgoing', $type, $subject, $body, (string) $request['contact_email'], $attachmentIds, $sent);
+        return $sent;
     }
 
-    private function send(string $recipient, string $subject, string $message, array $headers = []): bool
+    private function send(string $recipient, string $subject, string $message, array $headers = [], array $attachmentIds = []): bool
     {
         $configuredName = (string) get_option('pov_email_sender_name', '');
         $configuredAddress = (string) get_option('pov_email_sender_address', '');
@@ -108,11 +138,33 @@ final class MailService
         add_filter('wp_mail_from_name', $nameFilter);
         add_filter('wp_mail_from', $addressFilter);
         try {
-            return wp_mail($recipient, $subject, $message, $headers);
+            return wp_mail($recipient, $subject, $message, $headers, (new AttachmentService())->paths($attachmentIds));
         } finally {
             remove_filter('wp_mail_from_name', $nameFilter);
             remove_filter('wp_mail_from', $addressFilter);
         }
+    }
+
+    private function record(
+        array $request,
+        string $direction,
+        string $type,
+        string $subject,
+        string $message,
+        string $recipient,
+        array $attachmentIds,
+        bool $sent
+    ): void {
+        (new CommunicationRepository())->record((int) ($request['id'] ?? 0), [
+            'direction' => $direction,
+            'communication_type' => $type,
+            'subject' => $subject,
+            'message' => $message,
+            'sender_name' => (string) get_option('pov_email_sender_name', 'Pro Ocean'),
+            'recipient' => $recipient,
+            'attachment_ids' => $attachmentIds,
+            'delivery_status' => $sent ? 'sent' : 'failed',
+        ]);
     }
 
     private function teamRecipients(): array

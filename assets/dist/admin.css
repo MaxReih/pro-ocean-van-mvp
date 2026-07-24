@@ -279,6 +279,9 @@
 .pov-admin-calendar-day em { background: rgba(18, 85, 121, .09); }
 .pov-admin-calendar-day.is-available { background: #eff8f3; border-color: #b8d9c9; }
 .pov-admin-calendar-day.is-limited { background: #fff8df; border-color: #e7cf80; }
+.pov-admin-calendar-day.is-walk_in { color: #fff; background: #e9823a; border-color: #e9823a; }
+.pov-admin-calendar-day.is-walk_in span,
+.pov-admin-calendar-day.is-walk_in em { color: #fff; background: rgba(255, 255, 255, .2); }
 .pov-admin-calendar-day.is-unavailable { background: #fcedeb; border-color: #edc1bc; }
 .pov-admin-calendar-day.is-confirmed { color: #fff; background: var(--pov-blue); border-color: var(--pov-blue); }
 .pov-admin-calendar-day.is-confirmed span,
@@ -288,6 +291,38 @@
 .pov-calendar-start { padding: 10px 12px; background: #f7f9f9; border-radius: 9px; }
 .pov-calendar-start > summary { color: var(--pov-blue); cursor: pointer; font-weight: 800; }
 .pov-calendar-start[open] { display: grid; gap: 10px; }
+.pov-walk-in-fields { display: grid; gap: 10px; padding: 12px; background: #fff5ec; border: 1px solid #f0c49f; border-radius: 9px; }
+.pov-communication-log-form,
+.pov-request-editor { margin-bottom: 14px; }
+.pov-communication-log-form > summary,
+.pov-request-editor > summary { color: var(--pov-blue); cursor: pointer; font-weight: 850; }
+.pov-communication-log-form[open] > summary,
+.pov-request-editor[open] > summary { margin-bottom: 12px; }
+.pov-communication-timeline { display: grid; gap: 10px; }
+.pov-communication-item { padding: 13px; background: #f7f9f9; border-left: 4px solid var(--pov-line); border-radius: 9px; }
+.pov-communication-item.is-incoming { background: #eff8f3; border-left-color: var(--pov-green); }
+.pov-communication-item.is-outgoing { background: var(--pov-blue-soft); border-left-color: var(--pov-blue); }
+.pov-communication-item.is-system { background: #f4f1f8; border-left-color: #7d6795; }
+.pov-communication-item header,
+.pov-communication-item footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--pov-muted); font-size: 9px; font-weight: 750; }
+.pov-communication-item h3 { margin: 7px 0 4px; font-size: 13px; }
+.pov-communication-item p { margin: 0 0 8px; white-space: normal; }
+.pov-communication-files { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.pov-communication-files a { padding: 4px 7px; background: #fff; border-radius: 6px; font-size: 10px; font-weight: 750; }
+.pov-delivery.is-failed { color: #a52e24; }
+.pov-danger-option { padding: 10px; color: #8f2b23; background: #fcedeb; border-radius: 8px; }
+.pov-default-attachments { display: grid; gap: 10px; padding: 12px; background: #f7f9f9; border-radius: 9px; }
+.pov-default-attachments h3 { margin: 0; }
+.pov-attachment-row { display: flex !important; align-items: center; gap: 6px; font-weight: 650 !important; }
+.pov-tour-expense-form { display: grid; grid-template-columns: repeat(2, minmax(90px, 1fr)); gap: 6px; width: min(100%, 520px); margin-left: auto; }
+.pov-tour-expense-form label { display: grid; gap: 3px; font-size: 8px; font-weight: 800; }
+.pov-tour-expense-form input { width: 100%; min-height: 32px; padding: 5px 7px; }
+.pov-tour-expense-form .button { align-self: end; }
+.pov-saved-expenses { display: grid; gap: 10px; margin: 14px; padding: 12px; background: #f7f9f9; border-radius: 9px; }
+.pov-saved-expenses h3 { margin: 0; font-size: 13px; }
+.pov-add-expense summary { cursor: pointer; font-weight: 800; }
+.pov-add-expense[open] .pov-tour-expense-form { margin-top: 10px; }
+.pov-inline-delete { text-align: right; }
 
 .pov-route-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
 .pov-route-overview > div { display: grid; gap: 4px; padding: 15px 17px; background: #fff; border: 1px solid var(--pov-line); border-radius: 12px; }

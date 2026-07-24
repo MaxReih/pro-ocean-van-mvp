@@ -51,4 +51,66 @@ final class ClassRepository
         $table = $wpdb->prefix . 'pov_request_classes';
         return (int) $wpdb->get_var($wpdb->prepare("SELECT SUM(participant_count) FROM {$table} WHERE request_id = %d", $requestId));
     }
+
+    public function updateFirstName(int $requestId, string $name): void
+    {
+        if ($requestId <= 0 || trim($name) === '') {
+            return;
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'pov_request_classes';
+        $id = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$table} WHERE request_id = %d ORDER BY sort_order ASC, id ASC LIMIT 1",
+            $requestId
+        ));
+        if ($id > 0) {
+            $wpdb->update($table, ['class_name' => sanitize_text_field($name)], ['id' => $id]);
+        }
+    }
+
+    public function syncParticipantTotal(int $requestId, int $participantTotal): void
+    {
+        if ($requestId <= 0 || $participantTotal < 0) {
+            return;
+        }
+
+        $classes = $this->forRequest($requestId);
+        if (! $classes) {
+            return;
+        }
+
+        $weightTotal = array_sum(array_map(
+            static fn (array $class): int => max(0, (int) ($class['participant_count'] ?? 0)),
+            $classes
+        ));
+        $weights = [];
+        foreach ($classes as $index => $class) {
+            $weight = $weightTotal > 0 ? max(0, (int) ($class['participant_count'] ?? 0)) : 1;
+            $exact = $participantTotal * $weight / ($weightTotal > 0 ? $weightTotal : count($classes));
+            $weights[$index] = [
+                'count' => (int) floor($exact),
+                'fraction' => $exact - floor($exact),
+            ];
+        }
+
+        $assigned = array_sum(array_column($weights, 'count'));
+        $remainder = $participantTotal - $assigned;
+        $order = array_keys($weights);
+        usort($order, static function (int $left, int $right) use ($weights): int {
+            return $weights[$right]['fraction'] <=> $weights[$left]['fraction'];
+        });
+        for ($index = 0; $index < $remainder; $index++) {
+            $weights[$order[$index % count($order)]]['count']++;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'pov_request_classes';
+        foreach ($classes as $index => $class) {
+            $wpdb->update(
+                $table,
+                ['participant_count' => $weights[$index]['count']],
+                ['id' => (int) $class['id']]
+            );
+        }
+    }
 }

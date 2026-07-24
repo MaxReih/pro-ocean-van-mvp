@@ -45,8 +45,63 @@ if ($cleanup !== '1') {
 
 global $wpdb;
 
+$attachmentOptions = [
+    'pov_confirmation_attachment_ids',
+    'pov_proposal_attachment_ids',
+    'pov_accept_attachment_ids',
+    'pov_question_attachment_ids',
+    'pov_reject_attachment_ids',
+];
+$attachmentIds = [];
+$attachmentIds = array_merge($attachmentIds, get_posts([
+    'post_type' => 'attachment',
+    'post_status' => 'any',
+    'posts_per_page' => -1,
+    'fields' => 'ids',
+    'meta_key' => '_pov_private_attachment',
+    'meta_value' => '1',
+    'no_found_rows' => true,
+]));
+foreach ($attachmentOptions as $option) {
+    $decoded = json_decode((string) get_option($option, ''), true);
+    if (is_array($decoded)) {
+        $attachmentIds = array_merge($attachmentIds, array_map('absint', $decoded));
+    }
+}
+$communicationsTable = $wpdb->prefix . 'pov_communications';
+if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $communicationsTable)) === $communicationsTable) {
+    foreach (($wpdb->get_col("SELECT attachment_ids FROM {$communicationsTable}") ?: []) as $encoded) {
+        $decoded = json_decode((string) $encoded, true);
+        if (is_array($decoded)) {
+            $attachmentIds = array_merge($attachmentIds, array_map('absint', $decoded));
+        }
+    }
+}
+foreach (array_values(array_unique(array_filter($attachmentIds))) as $attachmentId) {
+    wp_delete_attachment((int) $attachmentId, true);
+}
+
+require_once __DIR__ . '/src/Service/AttachmentService.php';
+$privateDirectory = \ProOceanVan\Service\AttachmentService::storageDirectoryPath();
+if ($privateDirectory !== '' && is_dir($privateDirectory)) {
+    $resolvedDirectory = realpath($privateDirectory);
+    if ($resolvedDirectory !== false) {
+        foreach ((array) glob($resolvedDirectory . DIRECTORY_SEPARATOR . '*') as $file) {
+            $resolvedFile = realpath($file);
+            if ($resolvedFile !== false
+                && is_file($resolvedFile)
+                && str_starts_with(wp_normalize_path($resolvedFile), trailingslashit(wp_normalize_path($resolvedDirectory)))) {
+                @unlink($resolvedFile);
+            }
+        }
+        @rmdir($resolvedDirectory);
+    }
+}
+
 $tables = [
     'pov_request_classes',
+    'pov_communications',
+    'pov_tour_expenses',
     'pov_suggestions',
     'pov_appointments',
     'pov_requests',
@@ -59,8 +114,9 @@ foreach ($tables as $table) {
     $wpdb->query('DROP TABLE IF EXISTS `' . esc_sql($wpdb->prefix . $table) . '`');
 }
 
-foreach (array_keys(wp_load_alloptions()) as $name) {
-    if (strpos($name, 'pov_') === 0) {
-        delete_option($name);
-    }
+foreach (($wpdb->get_col($wpdb->prepare(
+    "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+    $wpdb->esc_like('pov_') . '%'
+)) ?: []) as $name) {
+    delete_option((string) $name);
 }

@@ -10,6 +10,7 @@ use ProOceanVan\Domain\SuggestionState;
 use ProOceanVan\Domain\WorkState;
 use ProOceanVan\Repository\AppointmentRepository;
 use ProOceanVan\Repository\CalendarDayRepository;
+use ProOceanVan\Repository\CommunicationRepository;
 use ProOceanVan\Repository\RequestRepository;
 use ProOceanVan\Repository\SuggestionRepository;
 
@@ -49,23 +50,23 @@ final class PublicSuggestionResponseService
             $this->renderConfirmationPage($request, $suggestion, $context['expires'], $context['token']);
         }
 
-        if ($alreadyAccepted) {
+        $result = (new AppointmentRepository())->withRequestLock(
+            (int) $request['id'],
+            fn (): array => $this->acceptWhileLocked((array) $input)
+        );
+        if (! is_array($result)) {
+            $this->renderResultPage('Termin derzeit nicht übernehmbar', 'Bitte versuche es in wenigen Minuten erneut.', 503);
+        }
+        if (($result['state'] ?? '') === 'already_accepted') {
             $this->renderResultPage('Terminwunsch bereits übernommen', 'Dieser Terminwunsch wurde bereits an das Ocean-Van-Team übermittelt.');
         }
-
-        if ((string) $suggestion['state'] !== SuggestionState::SENT) {
-            wp_die('Dieser Terminvorschlag kann nicht mehr angenommen werden.', 'Ocean Van Termin', ['response' => 409]);
+        if (($result['state'] ?? '') !== 'accepted') {
+            $this->renderResultPage(
+                'Termin nicht mehr verfügbar',
+                (string) ($result['message'] ?? 'Dieser Terminvorschlag kann nicht mehr angenommen werden.'),
+                409
+            );
         }
-
-        $availabilityError = $this->availabilityError($request, $suggestion);
-        if ($availabilityError !== '') {
-            $this->renderResultPage('Termin nicht mehr verfügbar', $availabilityError, 409);
-        }
-
-        $requests = new RequestRepository();
-        $suggestions = new SuggestionRepository();
-        $suggestions->acceptPublicChoice((int) $request['id'], (int) $suggestion['id']);
-        $requests->updateStatus((int) $request['id'], RequestStatus::PROPOSAL_SENT, WorkState::IN_REVIEW);
 
         $this->renderResultPage('Terminwunsch übernommen', 'Danke, der Terminwunsch wurde übernommen. Wir melden uns mit der finalen Bestätigung.');
     }
@@ -122,6 +123,77 @@ final class PublicSuggestionResponseService
             $expires,
         ]);
         return hash_hmac('sha256', $payload, wp_salt('auth'));
+    }
+
+    private function acceptWhileLocked(array $input): array
+    {
+        $context = $this->validatedContext($input);
+        if (! $context) {
+            return [
+                'state' => 'unavailable',
+                'message' => 'Dieser Terminvorschlag wurde bereits bearbeitet oder ist abgelaufen.',
+            ];
+        }
+
+        $request = $context['request'];
+        $suggestion = $context['suggestion'];
+        if ($context['already_accepted']) {
+            return ['state' => 'already_accepted'];
+        }
+        if ((string) $suggestion['state'] !== SuggestionState::SENT) {
+            return [
+                'state' => 'unavailable',
+                'message' => 'Dieser Terminvorschlag kann nicht mehr angenommen werden.',
+            ];
+        }
+
+        $availabilityError = $this->availabilityError($request, $suggestion);
+        if ($availabilityError !== '') {
+            return ['state' => 'unavailable', 'message' => $availabilityError];
+        }
+
+        global $wpdb;
+        $wpdb->query('START TRANSACTION');
+        try {
+            $suggestions = new SuggestionRepository();
+            if (! $suggestions->acceptPublicChoice((int) $request['id'], (int) $suggestion['id'])) {
+                $wpdb->query('ROLLBACK');
+                return [
+                    'state' => 'unavailable',
+                    'message' => 'Dieser Terminvorschlag wurde bereits bearbeitet.',
+                ];
+            }
+
+            (new RequestRepository())->updateStatus(
+                (int) $request['id'],
+                RequestStatus::PROPOSAL_SENT,
+                WorkState::IN_REVIEW
+            );
+            if ((string) $wpdb->last_error !== '') {
+                throw new \RuntimeException('Anfragestatus konnte nicht gespeichert werden.');
+            }
+            $communicationId = (new CommunicationRepository())->record((int) $request['id'], [
+                'direction' => 'incoming',
+                'communication_type' => 'proposal_accepted',
+                'subject' => 'Terminvorschlag angenommen',
+                'message' => 'Gewünschter Termin: ' . GermanDateFormatter::full((string) $suggestion['suggestion_date']),
+                'sender_name' => trim((string) $request['contact_first_name'] . ' ' . (string) $request['contact_last_name']),
+                'recipient' => 'Pro Ocean Team',
+                'delivery_status' => 'received',
+            ]);
+            if ($communicationId <= 0 || (string) $wpdb->last_error !== '') {
+                throw new \RuntimeException('Terminannahme konnte nicht protokolliert werden.');
+            }
+            $wpdb->query('COMMIT');
+        } catch (\Throwable $error) {
+            $wpdb->query('ROLLBACK');
+            return [
+                'state' => 'failed',
+                'message' => 'Der Termin konnte nicht gespeichert werden. Bitte versuche es erneut.',
+            ];
+        }
+
+        return ['state' => 'accepted'];
     }
 
     private function availabilityError(array $request, array $suggestion): string

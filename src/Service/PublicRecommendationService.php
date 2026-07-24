@@ -24,13 +24,14 @@ final class PublicRecommendationService
         $postalCode = preg_replace('/\D+/', '', $postalCode);
         $stateCode = strtoupper(sanitize_key($stateCode));
         if (! preg_match('/^\d{5}$/', $postalCode)) {
-            return ['ok' => false, 'message' => 'Bitte prüfe die PLZ.', 'suggestions' => [], 'fallback' => true];
+            return ['ok' => false, 'message' => 'Bitte prüfe die PLZ.', 'suggestions' => [], 'eligible_dates' => [], 'filter_applied' => false, 'fallback' => true];
         }
         if (! (new StateRepository())->isActive($stateCode)) {
-            return ['ok' => false, 'message' => 'Für dieses Bundesland nehmen wir aktuell noch keine Anfragen an.', 'suggestions' => [], 'fallback' => true];
+            return ['ok' => false, 'message' => 'Für dieses Bundesland nehmen wir aktuell noch keine Anfragen an.', 'suggestions' => [], 'eligible_dates' => [], 'filter_applied' => false, 'fallback' => true];
         }
+        $tokenService = new EligibilityTokenService();
         if (! (new CostService())->isConfigured()) {
-            return ['ok' => true, 'message' => 'Kein passender Routentermin gefunden.', 'suggestions' => [], 'fallback' => true];
+            return ['ok' => true, 'message' => 'Kein passender Routentermin gefunden.', 'suggestions' => [], 'eligible_dates' => [], 'eligibility_token' => $tokenService->issue($postalCode, $stateCode, []), 'filter_applied' => true, 'fallback' => true];
         }
 
         $location = (new PostalCodeService())->resolve($postalCode, $stateCode);
@@ -47,7 +48,7 @@ final class PublicRecommendationService
             $geo = ['ok' => false, 'error' => (string) ($location['error'] ?? 'PLZ nicht gefunden.')];
         }
         if (empty($geo['ok'])) {
-            return ['ok' => true, 'message' => 'Die Routenprüfung ist gerade nicht verfügbar. Du kannst trotzdem einen Zeitraum anfragen.', 'suggestions' => [], 'fallback' => true];
+            return ['ok' => true, 'message' => 'Die Routenprüfung ist gerade nicht verfügbar. Du kannst trotzdem einen Zeitraum anfragen.', 'suggestions' => [], 'eligible_dates' => [], 'eligibility_token' => $tokenService->issue($postalCode, $stateCode, []), 'filter_applied' => true, 'fallback' => true];
         }
 
         $today = new DateTimeImmutable('today', wp_timezone());
@@ -75,7 +76,7 @@ final class PublicRecommendationService
             }
             $dayRow = $calendar[$date] ?? null;
             $state = $dayRow['availability_state'] ?? CalendarState::AVAILABLE;
-            if ($state === CalendarState::UNAVAILABLE) {
+            if (in_array($state, [CalendarState::UNAVAILABLE, CalendarState::WALK_IN], true)) {
                 continue;
             }
 
@@ -185,6 +186,10 @@ final class PublicRecommendationService
             return $score !== 0 ? $score : strcmp((string) $a['date'], (string) $b['date']);
         });
         $weekSuggestions = $this->weekSuggestions($suggestions);
+        $eligibleDates = array_values(array_unique(array_map(
+            static fn (array $suggestion): string => (string) $suggestion['date'],
+            $suggestions
+        )));
         $suggestions = array_slice($suggestions, 0, 2);
         $publicSuggestions = array_map(static fn (array $suggestion): array => [
             'date' => (string) $suggestion['date'],
@@ -202,6 +207,9 @@ final class PublicRecommendationService
             'message' => $suggestions ? 'Diese Tage passen gut zu unserer Route' : 'Kein passender Routentermin gefunden.',
             'suggestions' => $publicSuggestions,
             'week_suggestions' => $publicWeeks,
+            'eligible_dates' => $eligibleDates,
+            'eligibility_token' => $tokenService->issue($postalCode, $stateCode, $eligibleDates),
+            'filter_applied' => true,
             'fallback' => ! $suggestions,
         ];
     }
@@ -290,7 +298,7 @@ final class PublicRecommendationService
                 $weeks[$weekKey] = [
                     'date_from' => $monday->format('Y-m-d'),
                     'date_to' => $friday->format('Y-m-d'),
-                    'label' => mysql2date('d. F', $monday->format('Y-m-d')) . ' bis ' . mysql2date('d. F', $friday->format('Y-m-d')),
+                    'label' => GermanDateFormatter::dayMonth($monday->format('Y-m-d')) . ' bis ' . GermanDateFormatter::dayMonth($friday->format('Y-m-d')),
                     'available_days' => [],
                     'score' => 0.0,
                     'estimated_savings_km' => 0.0,

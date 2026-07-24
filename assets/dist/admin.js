@@ -29,12 +29,21 @@
         form.querySelector('[name="calendar_date_from"]').value = day.dataset.date || '';
         form.querySelector('[name="calendar_date_to"]').value = day.dataset.date || '';
         form.querySelector('[name="availability_state"]').value = day.dataset.state || 'available';
+        form.querySelector('[name="availability_state"]').dispatchEvent(new Event('change', { bubbles: true }));
         form.querySelector('[name="public_note"]').value = day.dataset.publicNote || '';
+        form.querySelector('[name="public_title"]').value = day.dataset.publicTitle || '';
+        form.querySelector('[name="public_description"]').value = day.dataset.publicDescription || '';
+        form.querySelector('[name="public_location"]').value = day.dataset.publicLocation || '';
+        form.querySelector('[name="public_url"]').value = day.dataset.publicUrl || '';
+        form.querySelector('[name="public_event_group"]').value = day.dataset.publicEventGroup || '';
+        form.querySelector('[name="walk_in_children"]').value = day.dataset.walkInChildren || '';
+        form.querySelector('[name="walk_in_adults"]').value = day.dataset.walkInAdults || '';
         form.querySelector('[name="internal_note"]').value = day.dataset.internalNote || '';
         form.querySelector('[name="custom_start_label"]').value = day.dataset.startLabel || '';
         form.querySelector('[name="custom_start_latitude"]').value = day.dataset.startLat || '';
         form.querySelector('[name="custom_start_longitude"]').value = day.dataset.startLon || '';
         form.querySelector('[name="calendar_date_to"]').min = day.dataset.date || '';
+        form.dataset.loadedDate = day.dataset.date || '';
         const exportSelect = document.querySelector('[data-pov-calendar-export-select]');
         if (exportSelect) {
           const matchingOption = Array.from(exportSelect.options).find((option) => option.dataset.date === day.dataset.date);
@@ -46,6 +55,32 @@
         form.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
+
+    const start = form.querySelector('[name="calendar_date_from"]');
+    const eventGroup = form.querySelector('[name="public_event_group"]');
+    if (start && eventGroup) {
+      start.addEventListener('input', () => {
+        if (form.dataset.loadedDate && start.value !== form.dataset.loadedDate) {
+          eventGroup.value = '';
+          delete form.dataset.loadedDate;
+        }
+      });
+    }
+
+    const state = form.querySelector('[data-pov-calendar-state]');
+    const walkInFields = form.querySelector('[data-pov-walk-in-fields]');
+    if (state && walkInFields) {
+      const updateWalkInFields = () => {
+        const visible = state.value === 'walk_in';
+        walkInFields.hidden = !visible;
+        walkInFields.querySelectorAll('input, textarea').forEach((field) => {
+          field.required = visible && field.name === 'public_title';
+        });
+      };
+      state.addEventListener('change', updateWalkInFields);
+      form.addEventListener('click', () => window.setTimeout(updateWalkInFields, 0));
+      updateWalkInFields();
+    }
   }
 
   function bindCalendarExport() {

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace ProOceanVan\Service;
 
 use DateTimeImmutable;
+use ProOceanVan\Domain\CalendarState;
+use ProOceanVan\Domain\EventType;
 use ProOceanVan\Domain\RequestStatus;
 use ProOceanVan\Domain\WorkState;
 use ProOceanVan\Repository\AppointmentRepository;
+use ProOceanVan\Repository\CalendarDayRepository;
 use ProOceanVan\Repository\ClassRepository;
 use ProOceanVan\Repository\RequestRepository;
 use ProOceanVan\Repository\SuggestionRepository;
@@ -25,7 +28,7 @@ final class DemoDataService
 {
     public const OPTION_KEY = 'pov_demo_data_manifest_v1';
 
-    private const MANIFEST_VERSION = 1;
+    private const MANIFEST_VERSION = 2;
     private const MARKER_PREFIX = 'POV_DEMO_DATA:';
 
     public function seed(): array
@@ -107,6 +110,25 @@ final class DemoDataService
 
                 $this->synchronizeAppointment($appointmentId, $request, $fixture['appointment'], $key);
                 $appointmentIds[$key] = $appointmentId;
+            }
+
+            $walkInDate = (string) ($fixtures['public_event_confirmed']['appointment']['date'] ?? '');
+            if ($this->validDate($walkInDate)) {
+                (new CalendarDayRepository())->upsert(
+                    $walkInDate,
+                    CalendarState::WALK_IN,
+                    'Offenes Programm – ohne Anmeldung.',
+                    $this->marker('walk_in'),
+                    [],
+                    [
+                        'title' => 'Zukunftsfest Nürnberg',
+                        'description' => 'Der Ocean Van ist mit einem offenen Mitmachprogramm vor Ort. Kommt einfach vorbei.',
+                        'location' => 'Hauptmarkt, Nürnberg',
+                        'url' => 'https://www.pro-ocean.com/',
+                        'participants_children' => '46',
+                        'participants_adults' => '34',
+                    ]
+                );
             }
 
             $manifest['request_ids'] = $requestIds;
@@ -342,6 +364,9 @@ final class DemoDataService
                     'date' => $appointmentDates['school_confirmed'],
                     'public_city' => 'Stuttgart',
                     'route' => ['start_label' => 'Depot Tübingen', 'start_latitude' => 48.5216364, 'start_longitude' => 9.0576448, 'distance_km' => 104.0, 'cost' => 88.40],
+                    'event_type' => EventType::SCHOOL,
+                    'participants_children' => 27,
+                    'participants_adults' => 3,
                 ],
             ]),
             'public_event_confirmed' => $this->fixture([
@@ -375,6 +400,9 @@ final class DemoDataService
                     'date' => $appointmentDates['public_event_confirmed'],
                     'public_city' => 'Nürnberg',
                     'route' => ['start_label' => 'Tourstopp Würzburg', 'start_latitude' => 49.7913, 'start_longitude' => 9.9534, 'distance_km' => 226.0, 'cost' => 192.10],
+                    'event_type' => EventType::EVENT,
+                    'participants_children' => 46,
+                    'participants_adults' => 34,
                 ],
             ]),
             'initiative_confirmed' => $this->fixture([
@@ -403,6 +431,9 @@ final class DemoDataService
                     'date' => $appointmentDates['initiative_confirmed'],
                     'public_city' => 'Trier',
                     'route' => ['start_label' => 'Tourstopp Koblenz', 'start_latitude' => 50.3569, 'start_longitude' => 7.5889, 'distance_km' => 258.0, 'cost' => 219.30],
+                    'event_type' => EventType::OTHER,
+                    'participants_children' => 18,
+                    'participants_adults' => 4,
                 ],
             ]),
         ];
@@ -410,6 +441,10 @@ final class DemoDataService
 
     private function fixture(array $data): array
     {
+        $participantTotal = array_sum(array_map(
+            static fn (array $class): int => (int) ($class['participant_count'] ?? 0),
+            (array) ($data['classes'] ?? [])
+        ));
         $payload = [
             'request_mode' => $data['request_mode'],
             'specific_requested_date' => $data['specific_requested_date'] ?? null,
@@ -418,6 +453,9 @@ final class DemoDataService
             'possible_weekdays' => $data['possible_weekdays'] ?? ['mon', 'tue', 'wed', 'thu', 'fri'],
             'institution_name' => $data['institution_name'],
             'institution_type' => $data['institution_type'],
+            'children_count' => (int) ($data['children_count'] ?? $participantTotal),
+            'adult_count' => (int) ($data['adult_count'] ?? 0),
+            'participant_total' => (int) ($data['children_count'] ?? $participantTotal) + (int) ($data['adult_count'] ?? 0),
             'contact_first_name' => $data['contact_first_name'],
             'contact_last_name' => $data['contact_last_name'],
             'contact_email' => $data['contact_email'],
@@ -510,6 +548,9 @@ final class DemoDataService
         $updated = $wpdb->update($wpdb->prefix . 'pov_requests', [
             'institution_name' => (string) $payload['institution_name'],
             'institution_type' => (string) $payload['institution_type'],
+            'children_count' => (int) $payload['children_count'],
+            'adult_count' => (int) $payload['adult_count'],
+            'participant_total' => (int) $payload['participant_total'],
             'contact_first_name' => (string) $payload['contact_first_name'],
             'contact_last_name' => (string) $payload['contact_last_name'],
             'contact_email' => (string) $payload['contact_email'],
@@ -608,7 +649,7 @@ final class DemoDataService
     {
         global $wpdb;
         return (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}pov_appointments WHERE appointment_date = %s",
+            "SELECT COUNT(*) FROM {$wpdb->prefix}pov_appointments WHERE status = 'confirmed' AND appointment_date = %s",
             $date
         )) > 0;
     }
@@ -619,6 +660,7 @@ final class DemoDataService
         $route = $appointment['route'];
         $updated = $wpdb->update($wpdb->prefix . 'pov_appointments', [
             'appointment_date' => $appointment['date'],
+            'status' => 'confirmed',
             'public_city' => sanitize_text_field((string) $appointment['public_city']),
             'latitude' => is_numeric($request['latitude'] ?? null) ? (float) $request['latitude'] : null,
             'longitude' => is_numeric($request['longitude'] ?? null) ? (float) $request['longitude'] : null,
@@ -627,6 +669,10 @@ final class DemoDataService
             'start_longitude' => (float) $route['start_longitude'],
             'route_distance_km' => (float) $route['distance_km'],
             'route_cost' => (float) $route['cost'],
+            'event_type' => (string) ($appointment['event_type'] ?? EventType::normalize((string) $request['institution_type'])),
+            'participants_children' => isset($appointment['participants_children']) ? (int) $appointment['participants_children'] : null,
+            'participants_adults' => isset($appointment['participants_adults']) ? (int) $appointment['participants_adults'] : null,
+            'metrics_recorded_at' => isset($appointment['participants_children']) || isset($appointment['participants_adults']) ? current_time('mysql') : null,
             'internal_notes' => $this->marker($key) . ' Bestätigter Demo-Termin.',
             'updated_at' => current_time('mysql'),
         ], ['id' => $appointmentId]);

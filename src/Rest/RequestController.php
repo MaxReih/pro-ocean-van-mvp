@@ -9,6 +9,7 @@ use ProOceanVan\Repository\AppointmentRepository;
 use ProOceanVan\Repository\CalendarDayRepository;
 use ProOceanVan\Repository\RequestRepository;
 use ProOceanVan\Repository\StateRepository;
+use ProOceanVan\Service\EligibilityTokenService;
 use ProOceanVan\Service\MailService;
 use ProOceanVan\Service\RequestRoutingService;
 use WP_Error;
@@ -39,6 +40,7 @@ final class RequestController
         'specific_requested_date' => 10,
         'desired_date_from' => 10,
         'desired_date_to' => 10,
+        'eligibility_token' => 20000,
         'accessibility_notes' => 5000,
         'group_notes' => 5000,
         'general_notes' => 5000,
@@ -119,6 +121,11 @@ final class RequestController
         if (! preg_match('/^\d{5}$/', (string) ($payload['postal_code'] ?? ''))) {
             return 'Bitte prüfe die PLZ.';
         }
+        $children = filter_var($payload['children_count'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => self::MAX_PARTICIPANTS]]);
+        $adults = filter_var($payload['adult_count'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => self::MAX_PARTICIPANTS]]);
+        if ($children === false || $adults === false || ($children + $adults) < 1 || ($children + $adults) > self::MAX_PARTICIPANTS) {
+            return 'Bitte prüfe die Anzahl der Kinder und Erwachsenen.';
+        }
         $mode = (string) ($payload['request_mode'] ?? 'date_range');
         if (! in_array($mode, ['specific_date', 'date_range'], true)) {
             return 'Bitte prüfe die gewünschte Terminart.';
@@ -135,6 +142,14 @@ final class RequestController
             $requestedDate = new DateTimeImmutable($date, wp_timezone());
             if ($date < $today || $requestedDate > $latestDate || (int) $requestedDate->format('N') >= 6) {
                 return 'Bitte wähle einen zukünftigen Werktag.';
+            }
+            if (! (new EligibilityTokenService())->allows(
+                (string) ($payload['eligibility_token'] ?? ''),
+                (string) ($payload['postal_code'] ?? ''),
+                (string) ($payload['state_code'] ?? ''),
+                $date
+            )) {
+                return 'Dieser Tag passt nicht mehr zur geprüften Route. Bitte suche die Termine erneut.';
             }
             if ((new CalendarDayRepository())->isBlocked($date) || (new AppointmentRepository())->existsOnDate($date)) {
                 return 'Dieser Tag ist inzwischen nicht mehr verfügbar. Bitte wähle einen anderen Termin.';
@@ -184,6 +199,9 @@ final class RequestController
             if ($participants > self::MAX_PARTICIPANTS) {
                 return 'Insgesamt können höchstens 500 Teilnehmende angefragt werden.';
             }
+        }
+        if ($participants !== ($children + $adults)) {
+            return 'Die Personenzahl stimmt nicht mit der Gruppe überein.';
         }
         foreach (['parking_available', 'indoor_room_available', 'bad_weather_option_available', 'electricity_available', 'water_available'] as $field) {
             if (isset($payload[$field]) && ! is_scalar($payload[$field])) {

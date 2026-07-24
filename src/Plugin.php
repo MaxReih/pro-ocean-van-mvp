@@ -14,6 +14,7 @@ use ProOceanVan\Rest\RecommendationController;
 use ProOceanVan\Rest\RequestController;
 use ProOceanVan\Service\PrivacyService;
 use ProOceanVan\Service\PublicSuggestionResponseService;
+use ProOceanVan\Service\AttachmentService;
 
 final class Plugin
 {
@@ -47,6 +48,7 @@ final class Plugin
         (new OperationsPortal())->register();
         (new PrivacyService())->register();
         (new PublicSuggestionResponseService())->register();
+        (new AttachmentService())->register();
 
         add_action('rest_api_init', [$this, 'registerRestRoutes']);
         add_action('pov_cleanup_route_cache', [Activation::class, 'cleanupRouteCache']);

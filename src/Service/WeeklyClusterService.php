@@ -13,16 +13,28 @@ use ProOceanVan\Repository\SuggestionRepository;
 final class WeeklyClusterService
 {
     private const MAX_OPEN_STOPS_PER_CLUSTER = 5;
+    private const CONFIRMED_SNAPSHOT_VERSION = 1;
+    private const CONFIRMED_SNAPSHOT_PREFIX = 'pov_statistics_route_snapshot_';
+
+    public function __construct(private readonly ?RouteOptimizationService $routeOptimization = null)
+    {
+    }
 
     public function clusters(): array
     {
+        $appointmentRepository = new AppointmentRepository();
+        $confirmedRequestIds = array_fill_keys(array_map(
+            'intval',
+            array_column($appointmentRepository->all(), 'request_id')
+        ), true);
         $requests = array_values(array_filter(
             (new RequestRepository())->list([], 200),
-            static fn (array $request): bool => ! in_array(
-                (string) ($request['work_state'] ?? ''),
-                [WorkState::ACCEPTED, WorkState::REJECTED, WorkState::CANCELLED],
-                true
-            )
+            static fn (array $request): bool => ! isset($confirmedRequestIds[(int) ($request['id'] ?? 0)])
+                && ! in_array(
+                    (string) ($request['work_state'] ?? ''),
+                    [WorkState::ACCEPTED, WorkState::REJECTED, WorkState::CANCELLED],
+                    true
+                )
         ));
         $weeks = [];
         $dates = [];
@@ -39,7 +51,7 @@ final class WeeklyClusterService
         }
         $today = current_time('Y-m-d');
         $horizon = (new DateTimeImmutable($today))->modify('+90 days')->format('Y-m-d');
-        $appointments = (new AppointmentRepository())->forRange(
+        $appointments = $appointmentRepository->forRange(
             $dates ? min(array_merge([$today], $dates)) : $today,
             $dates ? max(array_merge([$horizon], $dates)) : $horizon
         );
@@ -65,11 +77,44 @@ final class WeeklyClusterService
             }
         }
 
-        usort($result, static function (array $left, array $right): int {
-            $weekComparison = $left['week_start'] <=> $right['week_start'];
-            return $weekComparison !== 0 ? $weekComparison : $right['cost_saved'] <=> $left['cost_saved'];
-        });
-        return array_values($result);
+        return $this->sortClusters($result);
+    }
+
+    /**
+     * Builds the same optimized weekly and regional tours as the planning view,
+     * but limits the stops to confirmed appointments. Supplying appointments is
+     * useful for deterministic calculations and tests; production uses the
+     * repository's confirmed-only result.
+     */
+    public function confirmedClusters(?array $appointments = null): array
+    {
+        $appointments ??= (new AppointmentRepository())->all();
+        $weeks = [];
+        foreach ($appointments as $appointment) {
+            if (isset($appointment['status']) && (string) $appointment['status'] !== 'confirmed') {
+                continue;
+            }
+            $date = (string) ($appointment['appointment_date'] ?? '');
+            if (! $this->validDate($date)) {
+                continue;
+            }
+            $appointment['_planning_date'] = $date;
+            $appointment['_stop_type'] = 'confirmed';
+            $weeks[(new DateTimeImmutable($date))->format('o-W')][] = $appointment;
+        }
+
+        $result = [];
+        $radiusKm = max(20.0, (float) get_option('pov_cluster_radius_km', 120));
+        foreach ($weeks as $week => $weekAppointments) {
+            foreach ($this->spatialClusters([], $weekAppointments, $radiusKm) as $index => $cluster) {
+                if (! $cluster['anchors']) {
+                    continue;
+                }
+                $result[] = $this->buildCluster($week, $index, $cluster, true);
+            }
+        }
+
+        return $this->sortClusters($result);
     }
 
     private function spatialClusters(array $requests, array $appointments, float $radiusKm): array
@@ -149,7 +194,7 @@ final class WeeklyClusterService
         return $clusters;
     }
 
-    private function buildCluster(string $week, int $index, array $cluster): array
+    private function buildCluster(string $week, int $index, array $cluster, bool $persistentConfirmedPlan = false): array
     {
         $anchors = $cluster['anchors'];
         usort($anchors, static fn (array $left, array $right): int => (string) $left['_planning_date'] <=> (string) $right['_planning_date']);
@@ -161,7 +206,9 @@ final class WeeklyClusterService
         $firstDate = new DateTimeImmutable((string) $stops[0]['_planning_date']);
         $monday = $firstDate->modify('monday this week');
         $depot = $this->depotForCluster($anchors);
-        $plan = (new RouteOptimizationService())->optimizeWithFixedOrder($fixedStops, $flexibleRequests, $depot);
+        $plan = $persistentConfirmedPlan
+            ? $this->confirmedPlan($fixedStops, $depot)
+            : ($this->routeOptimization ?? new RouteOptimizationService())->optimizeWithFixedOrder($fixedStops, $flexibleRequests, $depot);
 
         $orderedKeys = [];
         foreach ($plan['ordered_stops'] as $stop) {
@@ -211,6 +258,111 @@ final class WeeklyClusterService
             'start_label' => (string) ($depot['label'] ?? get_option('pov_default_start_label', 'Start')),
             'priority' => $plan['savings_percent'] >= 15 ? 'recommended' : 'standard',
         ];
+    }
+
+    private function confirmedPlan(array $stops, ?array $depot): array
+    {
+        $fingerprint = $this->confirmedPlanFingerprint($stops, $depot);
+        $optionName = self::CONFIRMED_SNAPSHOT_PREFIX . $fingerprint;
+        $snapshot = get_option($optionName);
+        if (is_array($snapshot)) {
+            $restored = $this->restoreConfirmedPlan($snapshot, $stops, $fingerprint);
+            if ($restored !== null) {
+                return $restored;
+            }
+        }
+
+        $plan = ($this->routeOptimization ?? new RouteOptimizationService())->optimizeWithFixedOrder($stops, [], $depot);
+        if ((string) ($plan['matrix_source'] ?? '') === 'estimated') {
+            return $plan;
+        }
+        $snapshotPlan = $plan;
+        $snapshotPlan['ordered_stop_keys'] = array_map([$this, 'stopKey'], (array) ($plan['ordered_stops'] ?? []));
+        unset($snapshotPlan['ordered_stops']);
+        update_option($optionName, [
+            'version' => self::CONFIRMED_SNAPSHOT_VERSION,
+            'fingerprint' => $fingerprint,
+            'plan' => $snapshotPlan,
+        ], false);
+        return $plan;
+    }
+
+    private function restoreConfirmedPlan(array $snapshot, array $stops, string $fingerprint): ?array
+    {
+        if ((int) ($snapshot['version'] ?? 0) !== self::CONFIRMED_SNAPSHOT_VERSION
+            || ! hash_equals($fingerprint, (string) ($snapshot['fingerprint'] ?? ''))
+            || ! is_array($snapshot['plan'] ?? null)) {
+            return null;
+        }
+
+        $plan = (array) $snapshot['plan'];
+        foreach ([
+            'ordered_stop_keys',
+            'legs',
+            'route_distance_km',
+            'route_duration_minutes',
+            'standalone_distance_km',
+            'distance_saved_km',
+            'estimated_cost',
+            'standalone_cost',
+            'cost_saved',
+            'savings_percent',
+            'matrix_source',
+            'stop_count',
+        ] as $field) {
+            if (! array_key_exists($field, $plan)) {
+                return null;
+            }
+        }
+
+        $currentStops = [];
+        foreach ($stops as $stop) {
+            $currentStops[$this->stopKey($stop)] = $stop;
+        }
+        $orderedStops = [];
+        foreach ((array) $plan['ordered_stop_keys'] as $key) {
+            if (isset($currentStops[(string) $key])) {
+                $orderedStops[] = $currentStops[(string) $key];
+                unset($currentStops[(string) $key]);
+            }
+        }
+        foreach ($currentStops as $stop) {
+            $orderedStops[] = $stop;
+        }
+        unset($plan['ordered_stop_keys']);
+        $plan['ordered_stops'] = $orderedStops;
+        return $plan;
+    }
+
+    private function confirmedPlanFingerprint(array $stops, ?array $depot): string
+    {
+        $depot ??= [
+            'latitude' => get_option('pov_default_start_latitude'),
+            'longitude' => get_option('pov_default_start_longitude'),
+            'label' => (string) get_option('pov_default_start_label', 'Depot'),
+        ];
+        $payload = [
+            'version' => self::CONFIRMED_SNAPSHOT_VERSION,
+            'depot' => [
+                'latitude' => is_numeric($depot['latitude'] ?? null) ? round((float) $depot['latitude'], 6) : null,
+                'longitude' => is_numeric($depot['longitude'] ?? null) ? round((float) $depot['longitude'], 6) : null,
+                'label' => trim((string) ($depot['label'] ?? $depot['start_label'] ?? '')),
+            ],
+            'routing' => [
+                'provider' => (string) get_option('pov_routing_provider', ''),
+                'base_url' => (string) get_option('pov_routing_base_url', ''),
+                'kilometer_rate' => (string) get_option('pov_kilometer_rate', ''),
+                'average_speed_kmh' => (string) get_option('pov_average_driving_speed_kmh', ''),
+            ],
+            'stops' => array_map(static fn (array $stop): array => [
+                'id' => (int) ($stop['id'] ?? 0),
+                'request_id' => (int) ($stop['request_id'] ?? 0),
+                'date' => (string) ($stop['_planning_date'] ?? $stop['appointment_date'] ?? ''),
+                'latitude' => is_numeric($stop['latitude'] ?? null) ? round((float) $stop['latitude'], 6) : null,
+                'longitude' => is_numeric($stop['longitude'] ?? null) ? round((float) $stop['longitude'], 6) : null,
+            ], $stops),
+        ];
+        return hash('sha256', (string) wp_json_encode($payload));
     }
 
     private function planningDate(array $request): string
@@ -387,6 +539,15 @@ final class WeeklyClusterService
         $value = sin($latitudeDelta / 2) ** 2
             + cos(deg2rad($left['latitude'])) * cos(deg2rad($right['latitude'])) * sin($longitudeDelta / 2) ** 2;
         return $earthKm * 2 * atan2(sqrt($value), sqrt(1 - $value));
+    }
+
+    private function sortClusters(array $clusters): array
+    {
+        usort($clusters, static function (array $left, array $right): int {
+            $weekComparison = $left['week_start'] <=> $right['week_start'];
+            return $weekComparison !== 0 ? $weekComparison : $right['cost_saved'] <=> $left['cost_saved'];
+        });
+        return array_values($clusters);
     }
 
     private function validDate(string $date): bool

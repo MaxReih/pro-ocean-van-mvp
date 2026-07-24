@@ -106,10 +106,22 @@ final class SuggestionRepository
         ));
     }
 
-    public function acceptPublicChoice(int $requestId, int $suggestionId): void
+    public function acceptPublicChoice(int $requestId, int $suggestionId): bool
     {
         global $wpdb;
         $table = $wpdb->prefix . 'pov_suggestions';
+        $accepted = $wpdb->query($wpdb->prepare(
+            "UPDATE {$table} SET state = %s, updated_at = %s WHERE id = %d AND request_id = %d AND state = %s",
+            SuggestionState::ACCEPTED,
+            current_time('mysql'),
+            $suggestionId,
+            $requestId,
+            SuggestionState::SENT
+        ));
+        if ($accepted !== 1) {
+            return false;
+        }
+
         $wpdb->query($wpdb->prepare(
             "UPDATE {$table} SET state = %s, updated_at = %s WHERE request_id = %d AND id != %d AND state IN (%s, %s, %s)",
             SuggestionState::EXPIRED,
@@ -120,12 +132,6 @@ final class SuggestionRepository
             SuggestionState::ACCEPTED,
             SuggestionState::SENT
         ));
-        $wpdb->update($table, [
-            'state' => SuggestionState::ACCEPTED,
-            'updated_at' => current_time('mysql'),
-        ], [
-            'id' => $suggestionId,
-            'request_id' => $requestId,
-        ]);
+        return true;
     }
 }

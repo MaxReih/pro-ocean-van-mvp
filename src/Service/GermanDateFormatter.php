@@ -80,6 +80,12 @@ final class GermanDateFormatter
         return $day ? self::MONTHS[(int) $day->format('n')] . ' ' . $day->format('Y') : $date;
     }
 
+    public static function dayMonth(string $date): string
+    {
+        $day = self::parse($date);
+        return $day ? $day->format('j') . '. ' . self::MONTHS[(int) $day->format('n')] : $date;
+    }
+
     private static function parse(string $date): ?DateTimeImmutable
     {
         $day = DateTimeImmutable::createFromFormat('!Y-m-d', $date);

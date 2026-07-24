@@ -7,6 +7,7 @@ namespace ProOceanVan;
 use ProOceanVan\Database\Schema;
 use ProOceanVan\Portal\OperationsPortal;
 use ProOceanVan\Security\Capabilities;
+use ProOceanVan\Service\AttachmentService;
 
 final class Activation
 {
@@ -53,12 +54,23 @@ final class Activation
 
     public static function installTables(): void
     {
+        $previousVersion = (string) get_option('pov_schema_version', '');
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         foreach ((new Schema())->sql() as $statement) {
             dbDelta($statement);
         }
 
         self::migrateSuggestionOrderColumn();
+        if ($previousVersion === '' || version_compare($previousVersion, '2026.07.24.1', '<')) {
+            self::migrateAppointmentReportingData();
+        }
+        if ($previousVersion === '' || version_compare($previousVersion, '2026.07.24.4', '<')) {
+            (new AttachmentService())->protectKnownAttachments();
+        }
+        if ($previousVersion === '' || version_compare($previousVersion, '2026.07.24.5', '<')) {
+            self::migrateWalkInEventGroups();
+        }
+        self::migrateAppointmentDateIndex();
 
         update_option('pov_schema_version', Schema::VERSION);
     }
@@ -75,6 +87,82 @@ final class Activation
         $columns = $wpdb->get_col("SHOW COLUMNS FROM {$table}") ?: [];
         if (in_array('rank', $columns, true) && in_array('sort_order', $columns, true)) {
             $wpdb->query("UPDATE {$table} SET sort_order = `rank` WHERE sort_order = 0");
+        }
+    }
+
+    private static function migrateAppointmentReportingData(): void
+    {
+        global $wpdb;
+        $appointments = $wpdb->prefix . 'pov_appointments';
+        $requests = $wpdb->prefix . 'pov_requests';
+        $classes = $wpdb->prefix . 'pov_request_classes';
+        $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $appointments));
+        if ($exists !== $appointments) {
+            return;
+        }
+
+        $wpdb->query(
+            "UPDATE {$requests} r
+             SET r.participant_total = (
+                 SELECT COALESCE(SUM(c.participant_count), 0)
+                 FROM {$classes} c
+                 WHERE c.request_id = r.id
+             )
+             WHERE r.participant_total = 0"
+        );
+        $wpdb->query(
+            "UPDATE {$appointments} a
+             INNER JOIN {$requests} r ON r.id = a.request_id
+             SET a.event_type = CASE
+                    WHEN LOWER(r.institution_type) LIKE '%schule%' THEN 'school'
+                    WHEN LOWER(r.institution_type) LIKE '%veranstaltung%' OR LOWER(r.institution_type) LIKE '%event%' THEN 'event'
+                    ELSE 'other'
+                 END
+             WHERE a.event_type = '' OR a.event_type = 'other'"
+        );
+    }
+
+    private static function migrateAppointmentDateIndex(): void
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'pov_appointments';
+        $index = $wpdb->get_row("SHOW INDEX FROM {$table} WHERE Key_name = 'appointment_date'", ARRAY_A);
+        if ($index && (int) ($index['Non_unique'] ?? 1) === 0) {
+            $wpdb->query("ALTER TABLE {$table} DROP INDEX appointment_date, ADD KEY appointment_date (appointment_date)");
+        }
+    }
+
+    private static function migrateWalkInEventGroups(): void
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'pov_calendar_days';
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, calendar_date, public_title, public_description, public_location, public_url, public_note
+             FROM {$table}
+             WHERE availability_state = %s AND (public_event_group IS NULL OR public_event_group = '')
+             ORDER BY calendar_date ASC",
+            'walk_in'
+        ), ARRAY_A) ?: [];
+        $previousDate = null;
+        $previousFingerprint = null;
+        $group = '';
+        foreach ($rows as $row) {
+            $date = (string) ($row['calendar_date'] ?? '');
+            $fingerprint = hash('sha256', (string) wp_json_encode([
+                $row['public_title'] ?? '',
+                $row['public_description'] ?? '',
+                $row['public_location'] ?? '',
+                $row['public_url'] ?? '',
+                $row['public_note'] ?? '',
+            ]));
+            $contiguous = $previousDate instanceof \DateTimeImmutable
+                && $previousDate->modify('+1 day')->format('Y-m-d') === $date;
+            if (! $contiguous || $fingerprint !== $previousFingerprint) {
+                $group = wp_generate_uuid4();
+            }
+            $wpdb->update($table, ['public_event_group' => $group], ['id' => (int) $row['id']]);
+            $previousDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $date) ?: null;
+            $previousFingerprint = $fingerprint;
         }
     }
 
@@ -153,6 +241,11 @@ final class Activation
             'pov_response_accept_template' => 'vielen Dank für eure Anfrage. Wir können den Ocean Van am ausgewählten Termin einplanen.',
             'pov_response_question_template' => 'vielen Dank für eure Anfrage. Für die weitere Planung benötigen wir noch folgende Information:',
             'pov_response_reject_template' => 'vielen Dank für eure Anfrage. Leider können wir den Ocean Van im angefragten Zeitraum nicht einplanen.',
+            'pov_confirmation_attachment_ids' => '',
+            'pov_proposal_attachment_ids' => '',
+            'pov_accept_attachment_ids' => '',
+            'pov_question_attachment_ids' => '',
+            'pov_reject_attachment_ids' => '',
             'pov_privacy_page_url' => '',
             'pov_cleanup_on_uninstall' => '0',
             'pov_test_profile_enabled' => '0',

@@ -45,6 +45,26 @@ final class AvailabilityService
                 ];
                 continue;
             }
+            $row = $calendarDays[$date] ?? null;
+            if (($row['availability_state'] ?? '') === CalendarState::WALK_IN) {
+                $title = trim((string) ($row['public_title'] ?? ''));
+                $result[] = [
+                    'date' => $date,
+                    'public_state' => CalendarState::WALK_IN,
+                    'public_label' => $title !== '' ? $title : 'Walk-in-Event',
+                    'public_city' => '',
+                    'is_weekend' => $isWeekend,
+                    'is_selectable' => false,
+                    'is_interactive' => true,
+                    'public_event' => [
+                        'title' => $title !== '' ? $title : 'Walk-in-Event',
+                        'description' => (string) ($row['public_description'] ?? ''),
+                        'location' => (string) ($row['public_location'] ?? ''),
+                        'url' => (string) ($row['public_url'] ?? ''),
+                    ],
+                ];
+                continue;
+            }
             if (isset($appointments[$date])) {
                 $city = (string) $appointments[$date]['public_city'];
                 $result[] = [
@@ -57,7 +77,6 @@ final class AvailabilityService
                 continue;
             }
 
-            $row = $calendarDays[$date] ?? null;
             $state = $row ? (string) $row['availability_state'] : CalendarState::AVAILABLE;
             if ($isWeekend && $state === CalendarState::AVAILABLE) {
                 $state = CalendarState::LIMITED;
@@ -69,6 +88,7 @@ final class AvailabilityService
                 'public_city' => '',
                 'is_weekend' => $isWeekend,
                 'is_selectable' => ! $isWeekend && $state !== CalendarState::UNAVAILABLE && $day >= $today,
+                'is_interactive' => false,
             ];
         }
 

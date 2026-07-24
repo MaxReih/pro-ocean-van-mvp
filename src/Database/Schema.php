@@ -6,7 +6,7 @@ namespace ProOceanVan\Database;
 
 final class Schema
 {
-    public const VERSION = '2026.07.15.1';
+    public const VERSION = '2026.07.24.5';
 
     /**
      * @return string[]
@@ -30,6 +30,9 @@ final class Schema
                 possible_weekdays VARCHAR(128) NULL,
                 institution_name VARCHAR(255) NOT NULL,
                 institution_type VARCHAR(120) NOT NULL,
+                children_count INT UNSIGNED NOT NULL DEFAULT 0,
+                adult_count INT UNSIGNED NOT NULL DEFAULT 0,
+                participant_total INT UNSIGNED NOT NULL DEFAULT 0,
                 contact_first_name VARCHAR(120) NOT NULL,
                 contact_last_name VARCHAR(120) NOT NULL,
                 contact_email VARCHAR(190) NOT NULL,
@@ -89,6 +92,14 @@ final class Schema
                 availability_state VARCHAR(32) NOT NULL DEFAULT 'available',
                 internal_note TEXT NULL,
                 public_note VARCHAR(255) NULL,
+                public_title VARCHAR(190) NULL,
+                public_description TEXT NULL,
+                public_location VARCHAR(255) NULL,
+                public_url VARCHAR(500) NULL,
+                public_event_group VARCHAR(64) NULL,
+                participants_children INT UNSIGNED NULL,
+                participants_adults INT UNSIGNED NULL,
+                metrics_recorded_at DATETIME NULL,
                 custom_start_label VARCHAR(190) NULL,
                 custom_start_latitude DECIMAL(10,7) NULL,
                 custom_start_longitude DECIMAL(10,7) NULL,
@@ -96,14 +107,22 @@ final class Schema
                 updated_at DATETIME NOT NULL,
                 PRIMARY KEY  (id),
                 UNIQUE KEY calendar_date (calendar_date),
-                KEY availability_state (availability_state)
+                KEY availability_state (availability_state),
+                KEY public_event_group (public_event_group)
             ) {$charset};",
             "CREATE TABLE {$prefix}pov_appointments (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 request_id BIGINT UNSIGNED NULL,
                 appointment_date DATE NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+                cancelled_at DATETIME NULL,
+                cancellation_reason TEXT NULL,
                 public_city VARCHAR(120) NOT NULL,
                 institution_name VARCHAR(255) NOT NULL,
+                event_type VARCHAR(32) NOT NULL DEFAULT 'other',
+                participants_children INT UNSIGNED NULL,
+                participants_adults INT UNSIGNED NULL,
+                metrics_recorded_at DATETIME NULL,
                 contact_name VARCHAR(190) NOT NULL,
                 contact_email VARCHAR(190) NOT NULL,
                 contact_phone VARCHAR(80) NOT NULL,
@@ -124,9 +143,47 @@ final class Schema
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
                 PRIMARY KEY  (id),
-                UNIQUE KEY appointment_date (appointment_date),
+                KEY appointment_date (appointment_date),
                 KEY request_id (request_id),
+                KEY status (status),
                 KEY state_code (state_code)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_tour_expenses (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                expense_type VARCHAR(32) NOT NULL DEFAULT 'overnight',
+                expense_date DATE NOT NULL,
+                request_id BIGINT UNSIGNED NULL,
+                appointment_id BIGINT UNSIGNED NULL,
+                place VARCHAR(190) NULL,
+                amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+                note TEXT NULL,
+                created_by BIGINT UNSIGNED NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                KEY expense_date (expense_date),
+                KEY request_id (request_id),
+                KEY appointment_id (appointment_id),
+                KEY expense_type (expense_type)
+            ) {$charset};",
+            "CREATE TABLE {$prefix}pov_communications (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                request_id BIGINT UNSIGNED NOT NULL,
+                direction VARCHAR(20) NOT NULL DEFAULT 'outgoing',
+                communication_type VARCHAR(40) NOT NULL DEFAULT 'message',
+                subject VARCHAR(255) NULL,
+                message LONGTEXT NOT NULL,
+                sender_name VARCHAR(190) NULL,
+                recipient VARCHAR(500) NULL,
+                sender_user_id BIGINT UNSIGNED NULL,
+                attachment_ids LONGTEXT NULL,
+                delivery_status VARCHAR(32) NOT NULL DEFAULT 'recorded',
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY  (id),
+                KEY request_id (request_id),
+                KEY direction (direction),
+                KEY communication_type (communication_type),
+                KEY created_at (created_at)
             ) {$charset};",
             "CREATE TABLE {$prefix}pov_suggestions (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -51,6 +51,19 @@
   color: #fff;
 }
 
+.pov-day[data-state="walk_in"] {
+  background: #e9823a;
+  border-color: #e9823a;
+  color: #fff;
+  cursor: pointer;
+}
+
+.pov-day[data-state="geo_unavailable"] {
+  background: #edf1f2;
+  border-color: #d3dde0;
+  color: #6d7d84;
+}
+
 .pov-day[data-state="unavailable"] {
   background: #f7d3cf;
   color: #661b16;

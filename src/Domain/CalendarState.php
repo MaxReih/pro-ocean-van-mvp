@@ -10,6 +10,7 @@ final class CalendarState
     public const LIMITED = 'limited';
     public const UNAVAILABLE = 'unavailable';
     public const TOUR = 'tour';
+    public const WALK_IN = 'walk_in';
 
     public static function labels(): array
     {
@@ -18,6 +19,7 @@ final class CalendarState
             self::LIMITED => 'Auf Anfrage',
             self::UNAVAILABLE => 'Nicht buchbar',
             self::TOUR => 'Van unterwegs',
+            self::WALK_IN => 'Walk-in-Event',
         ];
     }
 }
