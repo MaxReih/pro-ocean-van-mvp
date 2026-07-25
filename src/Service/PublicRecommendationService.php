@@ -34,11 +34,19 @@ final class PublicRecommendationService
             return ['ok' => true, 'message' => 'Kein passender Routentermin gefunden.', 'suggestions' => [], 'eligible_dates' => [], 'eligibility_token' => $tokenService->issue($postalCode, $stateCode, []), 'filter_applied' => true, 'fallback' => true];
         }
 
+        $states = new StateRepository();
         $location = (new PostalCodeService())->resolve($postalCode, $stateCode);
         $geoAddress = ['postal_code' => $postalCode, 'state_code' => $stateCode];
         if (! empty($location['ok'])) {
             $geoAddress['city'] = (string) $location['city'];
             $geoAddress['state'] = (string) $location['state_name'];
+        } else {
+            foreach ($states->all(false) as $state) {
+                if (strtoupper((string) ($state['state_code'] ?? '')) === $stateCode) {
+                    $geoAddress['state'] = (string) ($state['state_name'] ?? '');
+                    break;
+                }
+            }
         }
 
         $factory = new ProviderFactory();

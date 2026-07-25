@@ -22,6 +22,7 @@ final class NominatimGeocodingProvider implements GeocodingProviderInterface
             'postal_code' => preg_replace('/\D+/', '', (string) ($address['postal_code'] ?? '')),
             'city' => sanitize_text_field((string) ($address['city'] ?? '')),
             'street' => trim(sanitize_text_field((string) ($address['street'] ?? '')) . ' ' . sanitize_text_field((string) ($address['house_number'] ?? ''))),
+            'state' => sanitize_text_field((string) ($address['state'] ?? '')),
             'state_code' => strtoupper(sanitize_key((string) ($address['state_code'] ?? ''))),
             'country' => 'Deutschland',
         ];
@@ -30,7 +31,7 @@ final class NominatimGeocodingProvider implements GeocodingProviderInterface
         }
 
         $cache = new RouteCacheRepository();
-        $providerKey = 'nominatim:' . substr(hash('sha256', $this->baseUrl), 0, 12);
+        $providerKey = 'nominatim:v2:' . substr(hash('sha256', $this->baseUrl), 0, 12);
         $cached = $cache->get($providerKey, 'geocode', $payload);
         if ($cached) {
             return $cached;
@@ -42,19 +43,13 @@ final class NominatimGeocodingProvider implements GeocodingProviderInterface
             'postalcode' => $payload['postal_code'],
             'city' => $payload['city'],
             'street' => $payload['street'],
+            'state' => $payload['state'],
             'country' => $payload['country'],
             'countrycodes' => 'de',
             'addressdetails' => 1,
         ], trailingslashit($this->baseUrl) . 'search');
 
-        $response = wp_remote_get($url, [
-            'timeout' => 5,
-            'redirection' => 2,
-            // LocalWP's bundled PHP can lack the system CA bundle. Keep TLS
-            // verification active everywhere except the explicitly local setup.
-            'sslverify' => ! (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local'),
-            'user-agent' => 'ProOceanVan/' . POV_VERSION . '; ' . home_url(),
-        ]);
+        $response = $this->request($url);
 
         if (is_wp_error($response)) {
             return ['ok' => false, 'error' => $response->get_error_message()];
@@ -62,12 +57,31 @@ final class NominatimGeocodingProvider implements GeocodingProviderInterface
 
         $code = (int) wp_remote_retrieve_response_code($response);
         $body = json_decode((string) wp_remote_retrieve_body($response), true);
+        if (($code !== 200 || ! is_array($body) || empty($body[0]['lat']) || empty($body[0]['lon'])) && $payload['postal_code'] !== '') {
+            $terms = array_filter([$payload['postal_code'], $payload['city'], $payload['state'], $payload['country']]);
+            $fallbackUrl = add_query_arg([
+                'format' => 'jsonv2',
+                'limit' => 1,
+                'q' => implode(' ', $terms),
+                'countrycodes' => 'de',
+                'addressdetails' => 1,
+            ], trailingslashit($this->baseUrl) . 'search');
+            $response = $this->request($fallbackUrl);
+            if (is_wp_error($response)) {
+                return ['ok' => false, 'error' => $response->get_error_message()];
+            }
+            $code = (int) wp_remote_retrieve_response_code($response);
+            $body = json_decode((string) wp_remote_retrieve_body($response), true);
+        }
         if ($code !== 200 || ! is_array($body) || empty($body[0]['lat']) || empty($body[0]['lon'])) {
             return ['ok' => false, 'error' => 'Geocoding ohne Treffer.'];
         }
 
         $resultAddress = (array) ($body[0]['address'] ?? []);
         $resultPostalCode = preg_replace('/\D+/', '', (string) ($resultAddress['postcode'] ?? ''));
+        if ($resultPostalCode === '' && $payload['postal_code'] !== '') {
+            $resultPostalCode = $payload['postal_code'];
+        }
         if ($payload['postal_code'] !== '' && $resultPostalCode !== '' && $resultPostalCode !== $payload['postal_code']) {
             return ['ok' => false, 'error' => 'Geocoding-Treffer passt nicht zur PLZ.'];
         }
@@ -83,5 +97,17 @@ final class NominatimGeocodingProvider implements GeocodingProviderInterface
         $cache->set($providerKey, 'geocode', $payload, $result, (int) get_option('pov_geocoding_cache_ttl', 30 * DAY_IN_SECONDS));
 
         return $result;
+    }
+
+    private function request(string $url): array|\WP_Error
+    {
+        return wp_remote_get($url, [
+            'timeout' => 5,
+            'redirection' => 2,
+            // LocalWP's bundled PHP can lack the system CA bundle. Keep TLS
+            // verification active everywhere except the explicitly local setup.
+            'sslverify' => ! (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local'),
+            'user-agent' => 'ProOceanVan/' . POV_VERSION . '; ' . home_url(),
+        ]);
     }
 }
