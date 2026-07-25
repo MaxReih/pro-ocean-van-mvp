@@ -104,7 +104,7 @@ final class OpenRouteServiceRoutingProvider implements RoutingProviderInterface
     private function httpArgs(array $body): array
     {
         return [
-            'timeout' => 6,
+            'timeout' => 3,
             'redirection' => 2,
             'sslverify' => ! (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local'),
             'headers' => [

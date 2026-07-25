@@ -44,7 +44,7 @@ final class PeliasGeocodingProvider implements GeocodingProviderInterface
             'size' => 1,
         ], static fn (mixed $value): bool => $value !== ''), trailingslashit($this->baseUrl) . 'search/structured');
         $response = wp_remote_get($url, [
-            'timeout' => 6,
+            'timeout' => 3,
             'redirection' => 2,
             'sslverify' => ! (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local'),
             'headers' => [
