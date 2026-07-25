@@ -320,8 +320,6 @@
 .pov-tour-expense-form .button { align-self: end; }
 .pov-saved-expenses { display: grid; gap: 10px; margin: 14px; padding: 12px; background: #f7f9f9; border-radius: 9px; }
 .pov-saved-expenses h3 { margin: 0; font-size: 13px; }
-.pov-add-expense summary { cursor: pointer; font-weight: 800; }
-.pov-add-expense[open] .pov-tour-expense-form { margin-top: 10px; }
 .pov-inline-delete { text-align: right; }
 
 .pov-route-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
@@ -414,12 +412,30 @@
 .pov-period-switch { display: flex; gap: 7px; margin: 0 0 12px 4px; }
 .pov-stat-overview { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .pov-stat-panel { display: grid; gap: 20px; }
+.pov-stat-panel .pov-panel-heading { margin-bottom: -8px; }
 .pov-stat-chart { display: grid; gap: 9px; padding: 4px; }
 .pov-stat-bar { display: grid; grid-template-columns: 125px minmax(100px, 1fr) 74px; gap: 12px; align-items: center; }
 .pov-stat-bar span { color: var(--pov-muted); font-size: 10px; font-weight: 750; }
 .pov-stat-bar i { position: relative; height: 12px; overflow: hidden; background: var(--pov-blue-soft); border-radius: 999px; }
 .pov-stat-bar i::after { display: block; width: var(--pov-bar); height: 100%; content: ""; background: linear-gradient(90deg, var(--pov-blue), #2b7897); border-radius: inherit; }
 .pov-stat-bar strong { font-size: 11px; text-align: right; }
+.pov-stat-periods { display: grid; gap: 10px; }
+.pov-stat-period { overflow: hidden; border: 1px solid var(--pov-line); border-radius: 12px; }
+.pov-stat-period > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 15px; background: var(--pov-blue-soft); }
+.pov-stat-period > header > div { display: grid; gap: 2px; }
+.pov-stat-period > header span,
+.pov-stat-period-grid span,
+.pov-stat-costs dt { color: var(--pov-muted); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.pov-stat-period > header strong { font-size: 15px; }
+.pov-stat-period-total { text-align: right; }
+.pov-stat-period-total strong { color: var(--pov-blue); font-size: 18px !important; }
+.pov-stat-period-grid { display: grid; grid-template-columns: .65fr 1fr .8fr 1.5fr; }
+.pov-stat-period-grid > div { display: grid; gap: 3px; align-content: start; min-width: 0; padding: 14px 15px; border-right: 1px solid #edf1f1; }
+.pov-stat-period-grid > div > strong { font-size: 18px; }
+.pov-stat-period-grid small { color: var(--pov-muted); font-size: 9px; line-height: 1.45; }
+.pov-stat-costs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 10px; }
+.pov-stat-costs > div { display: grid; gap: 3px; padding: 8px; background: #f7f9f9; border-radius: 7px; }
+.pov-stat-costs dd { margin: 0; color: var(--pov-dark); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .pov-settings-action { display: grid; gap: 5px; align-content: end; }
 .pov-settings-action span { color: var(--pov-muted); font-size: 9px; }
 
@@ -441,6 +457,9 @@
   .pov-admin-suggestion { grid-template-columns: 54px minmax(190px, 1fr) auto; }
   .pov-admin-suggestion-actions { grid-column: 2 / -1; grid-row: 2; display: flex; justify-content: flex-end; }
   .pov-route-cluster-body { grid-template-columns: 1fr; }
+  .pov-stat-period-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pov-stat-period-grid > div:nth-child(2) { border-right: 0; }
+  .pov-stat-costs { border-top: 1px solid #edf1f1; }
 }
 
 @media (max-width: 960px) {
@@ -505,6 +524,10 @@
   .pov-route-issues { grid-template-columns: 1fr; }
   .pov-geo-result > div { grid-template-columns: 1fr; }
   .pov-stat-bar { grid-template-columns: 84px minmax(80px, 1fr) 58px; }
+  .pov-stat-period-grid { grid-template-columns: 1fr; }
+  .pov-stat-period-grid > div { border-right: 0; border-bottom: 1px solid #edf1f1; }
+  .pov-stat-period-grid > div:last-of-type { border-bottom: 0; }
+  .pov-stat-costs { grid-template-columns: 1fr; }
   .pov-tour-stop { grid-template-columns: 48px minmax(0, 1fr); }
   .pov-tour-stop > a { grid-column: 2; width: fit-content; }
 }

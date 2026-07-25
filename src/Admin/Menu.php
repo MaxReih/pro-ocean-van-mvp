@@ -291,24 +291,29 @@ final class Menu
         if (! $rows) {
             echo '<div class="pov-admin-empty"><strong>Noch keine bestätigten Einsätze.</strong></div>';
         } else {
+            echo '<div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Kostenverlauf</span><h2>Zeiträume im Vergleich</h2></div></div>';
             echo '<div class="pov-stat-chart" aria-label="Kostenverlauf">';
             foreach ($rows as $row) {
                 $width = max(2.0, ((float) $row['total_cost'] / $maxCost) * 100);
                 echo '<div class="pov-stat-bar"><span>' . esc_html((string) $row['label']) . '</span><i style="--pov-bar:' . esc_attr(number_format($width, 2, '.', '')) . '%"></i><strong>' . esc_html(number_format((float) $row['total_cost'], 0, ',', '.') . ' €') . '</strong></div>';
             }
-            echo '</div><div class="pov-table-scroll"><table class="pov-compact-table"><thead><tr><th>Zeitraum</th><th>Einsätze</th><th>Arten</th><th>Personen</th><th>Strecke</th><th>Fahrzeit</th><th>Fahrt</th><th>Personal</th><th>Übernachtung</th><th>Gesamt</th></tr></thead><tbody>';
+            echo '</div><div class="pov-stat-periods">';
             foreach ($rows as $row) {
                 $typeLabels = [];
                 foreach ((array) ($row['event_types'] ?? []) as $type => $count) {
-                    $typeLabels[] = (EventType::labels()[$type] ?? EventType::labels()[EventType::OTHER]) . ': ' . $count;
+                    $typeLabels[] = (EventType::labels()[$type] ?? EventType::labels()[EventType::OTHER]) . ' ' . $count;
                 }
-                $people = (int) $row['participants_total'] . ' (' . (int) $row['participants_children'] . '/' . (int) $row['participants_adults'] . ')';
+                $people = (int) $row['participants_children'] . ' Kinder · ' . (int) $row['participants_adults'] . ' Erwachsene';
                 if ((int) ($row['participants_missing'] ?? 0) > 0) {
                     $people .= ' · ' . (int) $row['participants_missing'] . ' offen';
                 }
-                echo '<tr><td><strong>' . esc_html((string) $row['label']) . '</strong></td><td>' . esc_html((string) $row['appointments']) . '</td><td>' . esc_html(implode(', ', $typeLabels)) . '</td><td>' . esc_html($people) . '</td><td>' . esc_html(number_format((float) $row['distance_km'], 0, ',', '.') . ' km') . '</td><td>' . esc_html($this->durationLabel((float) $row['travel_minutes'])) . '</td><td>' . esc_html(number_format((float) $row['route_cost'], 2, ',', '.') . ' €') . '</td><td>' . esc_html(number_format((float) $row['personnel_cost'], 2, ',', '.') . ' €') . '</td><td>' . esc_html(number_format((float) $row['overnight_cost'], 2, ',', '.') . ' €') . '</td><td><strong>' . esc_html(number_format((float) $row['total_cost'], 2, ',', '.') . ' €') . '</strong></td></tr>';
+                echo '<article class="pov-stat-period"><header><div><span>Zeitraum</span><strong>' . esc_html((string) $row['label']) . '</strong></div><div class="pov-stat-period-total"><span>Gesamtkosten</span><strong>' . esc_html(number_format((float) $row['total_cost'], 2, ',', '.') . ' €') . '</strong></div></header>';
+                echo '<div class="pov-stat-period-grid"><div><span>Einsätze</span><strong>' . esc_html((string) $row['appointments']) . '</strong><small>' . esc_html($typeLabels ? implode(' · ', $typeLabels) : 'Keine Art erfasst') . '</small></div>';
+                echo '<div><span>Personen</span><strong>' . esc_html(number_format((int) $row['participants_total'], 0, ',', '.')) . '</strong><small>' . esc_html($people) . '</small></div>';
+                echo '<div><span>Mobilität</span><strong>' . esc_html(number_format((float) $row['distance_km'], 0, ',', '.') . ' km') . '</strong><small>' . esc_html($this->durationLabel((float) $row['travel_minutes'])) . '</small></div>';
+                echo '<dl class="pov-stat-costs"><div><dt>Fahrt</dt><dd>' . esc_html(number_format((float) $row['route_cost'], 2, ',', '.') . ' €') . '</dd></div><div><dt>Personal</dt><dd>' . esc_html(number_format((float) $row['personnel_cost'], 2, ',', '.') . ' €') . '</dd></div><div><dt>Übernachtung</dt><dd>' . esc_html(number_format((float) $row['overnight_cost'], 2, ',', '.') . ' €') . '</dd></div></dl></div></article>';
             }
-            echo '</tbody></table></div>';
+            echo '</div>';
         }
         echo '<p class="description">Bestätigte Einsätze · Personal inklusive Einsatz- und Fahrzeit.</p></section>';
         echo '<section class="pov-admin-panel"><h2>Veranstaltungsarten</h2><div class="pov-table-scroll"><table class="pov-compact-table"><thead><tr><th>Art</th><th>Einsätze</th><th>Kinder</th><th>Erwachsene</th><th>Gesamt</th><th>Noch offen</th></tr></thead><tbody>';
@@ -393,15 +398,6 @@ final class Menu
             }
             $returnLeg = (array) ($legs[count($stops)] ?? []);
             echo '<div class="pov-tour-leg"><span>Rückfahrt</span><strong>' . esc_html(number_format((float) ($returnLeg['distance_km'] ?? 0), 0, ',', '.') . ' km · ' . $this->durationLabel((float) ($returnLeg['duration_minutes'] ?? 0))) . '</strong></div><div class="pov-tour-depot is-end"><span>S</span><div><small>Ziel</small><strong>' . esc_html((string) $cluster['start_label']) . '</strong></div></div></div>';
-            if ($stops && current_user_can(Capabilities::MANAGE_TOURS)) {
-                $expenseAnchor = $stops[0];
-                echo '<details class="pov-saved-expenses pov-add-expense"><summary>Übernachtungskosten hinzufügen</summary>'
-                    . $this->tourExpenseForm($expenseAnchor, [
-                        'date' => (string) $cluster['week_start'],
-                        'place' => (string) ($expenseAnchor['city'] ?? ''),
-                    ])
-                    . '</details>';
-            }
             if ((int) $cluster['missing_coordinates'] > 0) {
                 echo '<p class="pov-route-warning">' . esc_html((string) $cluster['missing_coordinates']) . ' Adresse' . ((int) $cluster['missing_coordinates'] === 1 ? '' : 'n') . ' ohne Koordinaten – nicht in der Route.</p>';
             }
@@ -417,17 +413,17 @@ final class Menu
 
     private function tourExpensesPanel(array $expenses): string
     {
+        if (! $expenses) {
+            return '';
+        }
+
         ob_start();
         echo '<section class="pov-admin-panel pov-all-expenses"><span class="pov-admin-eyebrow">Kosten</span><h2>Alle Übernachtungskosten</h2>';
-        if (! $expenses) {
-            echo '<div class="pov-admin-empty"><strong>Noch keine Übernachtungskosten gespeichert.</strong></div>';
-        } else {
-            echo '<div class="pov-saved-expenses">';
-            foreach ($expenses as $expense) {
-                echo $this->tourExpenseForm([], [], $expense);
-            }
-            echo '</div>';
+        echo '<div class="pov-saved-expenses">';
+        foreach ($expenses as $expense) {
+            echo $this->tourExpenseForm([], [], $expense);
         }
+        echo '</div>';
         return (string) ob_get_clean() . '</section>';
     }
 

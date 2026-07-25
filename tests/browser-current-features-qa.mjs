@@ -166,18 +166,26 @@ await screenshot('current-features-backend-calendar.png');
 
 await navigate(baseUrl + '/van-operations/?view=routes', '.pov-admin');
 const routeBackendAudit = await evaluate(`(() => ({
-  expenseForms: document.querySelectorAll('form[action*="pov_save_tour_expense"], form input[name="action"][value="pov_save_tour_expense"]').length,
-  overnightCosts: document.body.innerText.includes('Übernachtung'),
+  overnightRecommendations: document.querySelectorAll('.pov-tour-overnight').length,
+  recommendationExpenseForms: document.querySelectorAll('.pov-tour-overnight .pov-tour-expense-form').length,
+  redundantExpenseForm: Boolean(document.querySelector('.pov-add-expense')),
 }))()`);
-expect(routeBackendAudit.expenseForms > 0 && routeBackendAudit.overnightCosts, 'Übernachtungskosten fehlen in der Tourplanung.');
+expect(routeBackendAudit.recommendationExpenseForms === routeBackendAudit.overnightRecommendations, 'Kostenpflege an den Übernachtungsempfehlungen ist unvollständig.');
+expect(!routeBackendAudit.redundantExpenseForm, 'Die redundante freie Erfassung von Übernachtungskosten ist noch sichtbar.');
+await screenshot('current-features-backend-routes.png');
 
 await navigate(baseUrl + '/van-operations/?view=statistics&period=month', '.pov-admin');
 const statisticsAudit = await evaluate(`(() => ({
   participantData: document.body.innerText.includes('Kinder') && document.body.innerText.includes('Erwachsene'),
   eventTypes: document.body.innerText.includes('Veranstaltungsarten'),
   overnightCosts: document.body.innerText.toLowerCase().includes('bernachtung'),
+  periodCards: document.querySelectorAll('.pov-stat-period').length,
+  costGroups: document.querySelectorAll('.pov-stat-costs').length,
+  horizontalOverflow: document.querySelector('.pov-stat-panel')?.scrollWidth > document.querySelector('.pov-stat-panel')?.clientWidth + 1,
 }))()`);
 expect(statisticsAudit.participantData && statisticsAudit.eventTypes && statisticsAudit.overnightCosts, 'Die neue Statistik ist unvollständig.');
+expect(statisticsAudit.periodCards > 0 && statisticsAudit.costGroups === statisticsAudit.periodCards, 'Die Kostenstatistik verwendet nicht durchgehend übersichtliche Zeitraumkarten.');
+expect(!statisticsAudit.horizontalOverflow, 'Die Kostenstatistik läuft horizontal aus dem sichtbaren Bereich.');
 await screenshot('current-features-backend-statistics.png');
 
 await navigate(baseUrl + '/van-operations/', '.pov-admin');
