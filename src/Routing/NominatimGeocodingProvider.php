@@ -50,6 +50,9 @@ final class NominatimGeocodingProvider implements GeocodingProviderInterface
         $response = wp_remote_get($url, [
             'timeout' => 5,
             'redirection' => 2,
+            // LocalWP's bundled PHP can lack the system CA bundle. Keep TLS
+            // verification active everywhere except the explicitly local setup.
+            'sslverify' => ! (function_exists('wp_get_environment_type') && wp_get_environment_type() === 'local'),
             'user-agent' => 'ProOceanVan/' . POV_VERSION . '; ' . home_url(),
         ]);
 
