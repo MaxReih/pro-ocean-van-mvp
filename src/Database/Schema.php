@@ -6,7 +6,7 @@ namespace ProOceanVan\Database;
 
 final class Schema
 {
-    public const VERSION = '2026.07.24.5';
+    public const VERSION = '2026.08.12.1';
 
     /**
      * @return string[]
@@ -30,9 +30,20 @@ final class Schema
                 possible_weekdays VARCHAR(128) NULL,
                 institution_name VARCHAR(255) NOT NULL,
                 institution_type VARCHAR(120) NOT NULL,
+                institution_website VARCHAR(500) NULL,
+                contact_role VARCHAR(120) NULL,
                 children_count INT UNSIGNED NOT NULL DEFAULT 0,
                 adult_count INT UNSIGNED NOT NULL DEFAULT 0,
                 participant_total INT UNSIGNED NOT NULL DEFAULT 0,
+                school_grade VARCHAR(40) NULL,
+                school_class_count INT UNSIGNED NULL,
+                school_teachers_per_class INT UNSIGNED NULL,
+                school_children_per_class INT UNSIGNED NULL,
+                school_needs TEXT NULL,
+                school_schedule_notes TEXT NULL,
+                event_child_age_range VARCHAR(120) NULL,
+                occasion_description TEXT NULL,
+                availability_window VARCHAR(32) NULL,
                 contact_first_name VARCHAR(120) NOT NULL,
                 contact_last_name VARCHAR(120) NOT NULL,
                 contact_email VARCHAR(190) NOT NULL,
@@ -45,7 +56,12 @@ final class Schema
                 latitude DECIMAL(10,7) NULL,
                 longitude DECIMAL(10,7) NULL,
                 parking_available VARCHAR(16) NOT NULL,
+                parking_type VARCHAR(64) NULL,
+                parking_location VARCHAR(500) NULL,
                 indoor_room_available VARCHAR(16) NOT NULL,
+                venue_type VARCHAR(32) NULL,
+                indoor_room_description TEXT NULL,
+                outdoor_area_description TEXT NULL,
                 bad_weather_option_available VARCHAR(16) NOT NULL,
                 electricity_available VARCHAR(16) NOT NULL,
                 water_available VARCHAR(16) NOT NULL,

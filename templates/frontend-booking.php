@@ -15,7 +15,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
         </a>
         <div>
             <span class="pov-kicker">Ocean Van</span>
-            <h1 id="pov-booking-title">Hol dir das Meer zu dir</h1>
+            <h1 id="pov-booking-title">Hol das Meer zu dir</h1>
         </div>
     </header>
 
@@ -70,10 +70,10 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <div class="pov-live pov-calendar-status" role="status" aria-live="polite" data-role="calendar-status"></div>
                 <div class="pov-calendar" data-role="calendar" role="group" aria-label="Verfügbare Besuchstage" aria-busy="false"></div>
                 <div class="pov-legend" aria-label="Kalenderlegende">
-                    <span><i class="is-available"></i>Buchbar</span>
+                    <span><i class="is-available"></i>Noch verfügbar</span>
                     <span><i class="is-limited"></i>Auf Anfrage</span>
                     <span><i class="is-tour"></i>Van unterwegs</span>
-                    <span><i class="is-walk-in"></i>Einfach vorbeikommen</span>
+                    <span><i class="is-walk-in"></i>Öffentliches Event</span>
                     <span><i class="is-unavailable"></i>Nicht buchbar</span>
                 </div>
             </section>
@@ -125,7 +125,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <label>Einrichtung oder Veranstalter
                     <input name="institution_name" required autocomplete="organization" placeholder="z. B. Meerblick-Schule oder Stadtfest">
                 </label>
-                <label>Anfrageart
+                <label>Veranstaltungsart
                     <select name="institution_type" required>
                         <option value="">Bitte auswählen</option>
                         <option value="Schule">Schule (kostenlos)</option>
@@ -144,6 +144,12 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </label>
                 <label>Telefon
                     <input type="tel" name="contact_phone" required autocomplete="tel">
+                </label>
+                <label>Funktion
+                    <input name="contact_role" required placeholder="z. B. Lehrkraft oder Veranstaltungsleitung">
+                </label>
+                <label>Website der Institution / Organisation
+                    <input type="url" name="institution_website" inputmode="url" autocomplete="url" placeholder="https://…">
                 </label>
                 <label class="pov-span-2">Straße
                     <input name="street" required autocomplete="address-line1">
@@ -165,28 +171,73 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         <?php endforeach; ?>
                     </select>
                 </label>
-                <label>Kinder und Jugendliche
-                    <input type="number" name="children_count" min="0" max="500" step="1" required inputmode="numeric" value="0">
-                </label>
-                <label>Erwachsene
-                    <input type="number" name="adult_count" min="0" max="500" step="1" required inputmode="numeric" value="0">
-                </label>
-                <label>Personen gesamt
-                    <input type="number" name="participant_total" min="1" max="500" step="1" inputmode="numeric" value="0" readonly>
-                </label>
-                <label>Zielgruppe
-                    <select name="target_group" required>
-                        <option value="">Bitte auswählen</option>
-                        <option>Grundschule</option>
-                        <option>Weiterführende Schule</option>
-                        <option>Kinder und Jugendliche</option>
-                        <option>Familien</option>
-                        <option>Erwachsene</option>
-                        <option>Gemischte Gruppe</option>
-                        <option>Sonstige Zielgruppe</option>
-                    </select>
-                </label>
             </div>
+
+            <section class="pov-type-section" data-event-section="Schule" hidden>
+                <h2>Schule</h2>
+                <div class="pov-grid-2">
+                    <label>Klassenstufe / Alter
+                        <select name="school_grade" data-type-required>
+                            <option value="">Bitte auswählen</option>
+                            <option value="preschool">Vorschule</option>
+                            <?php for ($grade = 1; $grade <= 13; $grade++) : ?>
+                                <option value="grade_<?php echo esc_attr((string) $grade); ?>"><?php echo esc_html((string) $grade . '. Klasse'); ?></option>
+                            <?php endfor; ?>
+                            <option value="vocational">Berufsschule</option>
+                            <option value="mixed">Altersgemischt</option>
+                        </select>
+                    </label>
+                    <label>Anzahl Klassen
+                        <input type="number" name="school_class_count" min="1" max="50" step="1" inputmode="numeric" value="1" data-type-required>
+                    </label>
+                    <label>Lehrpersonal je Klasse
+                        <input type="number" name="school_teachers_per_class" min="0" max="20" step="1" inputmode="numeric" value="1" data-type-required>
+                    </label>
+                    <label>Teilnehmende Kinder / Klasse
+                        <input type="number" name="school_children_per_class" min="1" max="100" step="1" inputmode="numeric" value="25" data-type-required data-participant-field>
+                    </label>
+                    <label>Teilnehmende Erwachsene
+                        <input type="number" name="school_adult_count" min="0" max="500" step="1" inputmode="numeric" value="1" data-type-required data-participant-field>
+                    </label>
+                    <label class="pov-span-2">Mehrere Klassen oder besondere Anforderungen
+                        <textarea name="school_needs" placeholder="Optional: Klassenaufteilung, Barrierefreiheit oder weitere Needs"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <section class="pov-type-section" data-event-section="Veranstaltung" hidden>
+                <h2>Veranstaltung</h2>
+                <div class="pov-grid-2">
+                    <label>Teilnehmende Kinder
+                        <input type="number" name="event_children_count" min="0" max="500" step="1" inputmode="numeric" value="0" data-type-required data-participant-field>
+                    </label>
+                    <label>Altersrange der teilnehmenden Kinder
+                        <input name="event_child_age_range" placeholder="z. B. 6–12 Jahre">
+                    </label>
+                    <label>Teilnehmende Erwachsene
+                        <input type="number" name="event_adult_count" min="0" max="500" step="1" inputmode="numeric" value="1" data-type-required data-participant-field>
+                    </label>
+                </div>
+            </section>
+
+            <section class="pov-type-section" data-event-section="Sonstiges" hidden>
+                <h2>Sonstiges</h2>
+                <div class="pov-grid-2">
+                    <label class="pov-span-2">Veranstaltungsart oder Anlass
+                        <textarea name="occasion_description" data-type-required placeholder="Beschreibt kurz, was geplant ist."></textarea>
+                    </label>
+                    <label>Teilnehmende Kinder
+                        <input type="number" name="other_children_count" min="0" max="500" step="1" inputmode="numeric" value="0" data-type-required data-participant-field>
+                    </label>
+                    <label>Teilnehmende Erwachsene
+                        <input type="number" name="other_adult_count" min="0" max="500" step="1" inputmode="numeric" value="1" data-type-required data-participant-field>
+                    </label>
+                </div>
+            </section>
+
+            <label class="pov-participant-total">Personen gesamt
+                <input type="number" name="participant_total" min="1" max="500" step="1" inputmode="numeric" value="0" readonly>
+            </label>
 
             <div class="pov-route-note" data-role="form-route-note" hidden>
                 <span data-role="form-route-note-text"></span>
@@ -198,16 +249,52 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
         </fieldset>
 
         <fieldset data-form-step="2" hidden>
-            <legend tabindex="-1">Ausstattung vor Ort</legend>
-            <p class="pov-fieldset-intro">„Unklar“ ist völlig in Ordnung.</p>
+            <legend tabindex="-1">Details vor Ort</legend>
+
+            <section class="pov-detail-block">
+                <h2>Zeit und Zugang</h2>
+                <div class="pov-grid-2">
+                    <label>Zeitliche Verfügbarkeit
+                        <select name="availability_window" required>
+                            <option value="">Bitte auswählen</option>
+                            <option value="morning">Vormittag</option>
+                            <option value="afternoon">Nachmittag</option>
+                            <option value="full_day">Ganztägig</option>
+                        </select>
+                    </label>
+                    <label data-event-section="Schule" hidden>Relevante Klassenstunden und Pausen
+                        <textarea name="school_schedule_notes" data-type-required placeholder="z. B. 2.–4. Stunde, große Pause 10:15–10:45 Uhr"></textarea>
+                    </label>
+                </div>
+                <p class="pov-planning-note">Für Aufbau und Vorbereitung benötigen wir mindestens 1 Stunde vor Veranstaltungsbeginn Zugang zur Räumlichkeit bzw. Fläche.</p>
+            </section>
+
+            <section class="pov-detail-block">
+                <h2>Einsatzfläche</h2>
+                <label>Einsatzbereich
+                    <select name="venue_type" required>
+                        <option value="">Bitte auswählen</option>
+                        <option value="indoor">Innenraum</option>
+                        <option value="outdoor">Außenbereich</option>
+                        <option value="both">Innen- und Außenbereich</option>
+                    </select>
+                </label>
+                <div class="pov-grid-2 pov-venue-details">
+                    <label data-venue-section="indoor" hidden>Räumlichkeit für den Inneneinsatz
+                        <textarea name="indoor_room_description" data-venue-required placeholder="Größe, Zugang, Etage und Besonderheiten"></textarea>
+                    </label>
+                    <label data-venue-section="outdoor" hidden>Fläche für den Außeneinsatz
+                        <textarea name="outdoor_area_description" data-venue-required placeholder="Untergrund, Größe, Zufahrt und Besonderheiten"></textarea>
+                    </label>
+                </div>
+            </section>
 
             <div class="pov-questions">
                 <?php
                 $questions = [
                     'parking_available' => 'Parkplatz für den Van',
-                    'electricity_available' => 'Stromanschluss in der Nähe',
+                    'electricity_available' => 'Stromanschluss nahe am Veranstaltungsort und zum Laden der Technik',
                     'water_available' => 'Wasser oder Waschbecken',
-                    'weather_option' => 'Innenraum oder Schlechtwetteroption',
                 ];
                 foreach ($questions as $name => $label) :
                     ?>
@@ -216,11 +303,36 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         <div>
                             <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="yes" required><span>Ja</span></label>
                             <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="no"><span>Nein</span></label>
-                            <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="unknown"><span>Unklar</span></label>
                         </div>
                     </fieldset>
                 <?php endforeach; ?>
+                <fieldset class="pov-choice-fieldset pov-question" data-venue-section="outdoor" hidden>
+                    <legend>Schlechtwetteroption für den Außeneinsatz</legend>
+                    <div>
+                        <label><input type="radio" name="bad_weather_option_available" value="yes" data-venue-required><span>Ja</span></label>
+                        <label><input type="radio" name="bad_weather_option_available" value="no"><span>Nein</span></label>
+                    </div>
+                </fieldset>
             </div>
+
+            <section class="pov-detail-block pov-parking-block">
+                <h2>Van-Stellplatz</h2>
+                <p class="pov-fieldset-intro">Van-Maße: 6 m lang, 2,05 m breit und 2,522 m hoch. Gewicht je nach Beladung ca. 2,5–3,5 t.</p>
+                <div class="pov-grid-2" data-parking-details hidden>
+                    <label>Art des Stellplatzes
+                        <select name="parking_type" data-parking-required>
+                            <option value="">Bitte auswählen</option>
+                            <option value="schoolyard">Schulhof</option>
+                            <option value="parking_lot">Parkplatz</option>
+                            <option value="street">Straßenrand / Ladezone</option>
+                            <option value="other">Sonstiger Stellplatz</option>
+                        </select>
+                    </label>
+                    <label>Adresse oder Google-Maps-Link
+                        <input name="parking_location" data-parking-required placeholder="Adresse oder https://maps.google.com/…">
+                    </label>
+                </div>
+            </section>
 
             <label>Hinweise zur Anfahrt
                 <textarea name="general_notes" placeholder="Optional: Zufahrt, Barrierefreiheit oder Besonderheiten"></textarea>
@@ -253,7 +365,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
 
     <dialog class="pov-walk-in-dialog" data-role="walk-in-dialog" aria-labelledby="pov-walk-in-title">
         <button type="button" class="pov-dialog-close" data-action="close-walk-in" aria-label="Schließen">×</button>
-        <span class="pov-kicker">Einfach vorbeikommen</span>
+        <span class="pov-kicker">Öffentliches Event</span>
         <h2 id="pov-walk-in-title" data-role="walk-in-title"></h2>
         <p class="pov-walk-in-date" data-role="walk-in-date"></p>
         <p data-role="walk-in-description"></p>

@@ -37,9 +37,20 @@ final class RequestRepository
             ))),
             'institution_name' => sanitize_text_field((string) ($payload['institution_name'] ?? '')),
             'institution_type' => sanitize_text_field((string) ($payload['institution_type'] ?? '')),
+            'institution_website' => esc_url_raw((string) ($payload['institution_website'] ?? '')),
+            'contact_role' => sanitize_text_field((string) ($payload['contact_role'] ?? '')),
             'children_count' => $children,
             'adult_count' => $adults,
             'participant_total' => $participantTotal,
+            'school_grade' => sanitize_text_field((string) ($payload['school_grade'] ?? '')),
+            'school_class_count' => $this->positiveIntOrNull($payload['school_class_count'] ?? null),
+            'school_teachers_per_class' => $this->nonNegativeIntOrNull($payload['school_teachers_per_class'] ?? null),
+            'school_children_per_class' => $this->positiveIntOrNull($payload['school_children_per_class'] ?? null),
+            'school_needs' => sanitize_textarea_field((string) ($payload['school_needs'] ?? '')),
+            'school_schedule_notes' => sanitize_textarea_field((string) ($payload['school_schedule_notes'] ?? '')),
+            'event_child_age_range' => sanitize_text_field((string) ($payload['event_child_age_range'] ?? '')),
+            'occasion_description' => sanitize_textarea_field((string) ($payload['occasion_description'] ?? '')),
+            'availability_window' => $this->allowedValue($payload['availability_window'] ?? '', ['morning', 'afternoon', 'full_day']),
             'contact_first_name' => sanitize_text_field((string) ($payload['contact_first_name'] ?? '')),
             'contact_last_name' => sanitize_text_field((string) ($payload['contact_last_name'] ?? '')),
             'contact_email' => sanitize_email((string) ($payload['contact_email'] ?? '')),
@@ -52,7 +63,12 @@ final class RequestRepository
             'latitude' => $this->coordinateOrNull($payload['_server_latitude'] ?? null, -90, 90),
             'longitude' => $this->coordinateOrNull($payload['_server_longitude'] ?? null, -180, 180),
             'parking_available' => $this->availabilityAnswer($payload['parking_available'] ?? ''),
+            'parking_type' => $this->allowedValue($payload['parking_type'] ?? '', ['schoolyard', 'parking_lot', 'street', 'other']),
+            'parking_location' => sanitize_text_field((string) ($payload['parking_location'] ?? '')),
             'indoor_room_available' => $this->availabilityAnswer($payload['indoor_room_available'] ?? ''),
+            'venue_type' => $this->allowedValue($payload['venue_type'] ?? '', ['indoor', 'outdoor', 'both']),
+            'indoor_room_description' => sanitize_textarea_field((string) ($payload['indoor_room_description'] ?? '')),
+            'outdoor_area_description' => sanitize_textarea_field((string) ($payload['outdoor_area_description'] ?? '')),
             'bad_weather_option_available' => $this->availabilityAnswer($payload['bad_weather_option_available'] ?? ''),
             'electricity_available' => $this->availabilityAnswer($payload['electricity_available'] ?? ''),
             'water_available' => $this->availabilityAnswer($payload['water_available'] ?? ''),
@@ -162,7 +178,7 @@ final class RequestRepository
             'new' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'new'"),
             'in_review' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'in_review'"),
             'awaiting_response' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'awaiting_response'"),
-            'warnings' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE parking_available != 'yes' OR indoor_room_available != 'yes' OR bad_weather_option_available != 'yes' OR electricity_available != 'yes' OR water_available != 'yes'"),
+            'warnings' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE parking_available != 'yes' OR electricity_available != 'yes' OR water_available != 'yes' OR (venue_type IN ('outdoor','both') AND bad_weather_option_available != 'yes')"),
             'routing_errors' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state NOT IN ('accepted','rejected','cancelled') AND (latitude IS NULL OR longitude IS NULL OR route_distance_km IS NULL)"),
         ];
     }
@@ -251,16 +267,32 @@ final class RequestRepository
             'possible_weekdays' => $mode === 'date_range' ? implode(',', $weekdays) : '',
             'institution_name' => sanitize_text_field((string) ($data['institution_name'] ?? '')),
             'institution_type' => sanitize_text_field((string) ($data['institution_type'] ?? '')),
+            'institution_website' => esc_url_raw((string) ($data['institution_website'] ?? '')),
+            'contact_role' => sanitize_text_field((string) ($data['contact_role'] ?? '')),
             'children_count' => $children,
             'adult_count' => $adults,
             'participant_total' => $total,
+            'school_grade' => sanitize_text_field((string) ($data['school_grade'] ?? '')),
+            'school_class_count' => $this->positiveIntOrNull($data['school_class_count'] ?? null),
+            'school_teachers_per_class' => $this->nonNegativeIntOrNull($data['school_teachers_per_class'] ?? null),
+            'school_children_per_class' => $this->positiveIntOrNull($data['school_children_per_class'] ?? null),
+            'school_needs' => sanitize_textarea_field((string) ($data['school_needs'] ?? '')),
+            'school_schedule_notes' => sanitize_textarea_field((string) ($data['school_schedule_notes'] ?? '')),
+            'event_child_age_range' => sanitize_text_field((string) ($data['event_child_age_range'] ?? '')),
+            'occasion_description' => sanitize_textarea_field((string) ($data['occasion_description'] ?? '')),
+            'availability_window' => $this->allowedValue($data['availability_window'] ?? '', ['morning', 'afternoon', 'full_day']),
             'contact_first_name' => sanitize_text_field((string) ($data['contact_first_name'] ?? '')),
             'contact_last_name' => sanitize_text_field((string) ($data['contact_last_name'] ?? '')),
             'contact_email' => sanitize_email((string) ($data['contact_email'] ?? '')),
             'contact_phone' => sanitize_text_field((string) ($data['contact_phone'] ?? '')),
             'general_notes' => sanitize_textarea_field((string) ($data['general_notes'] ?? '')),
             'parking_available' => $this->availabilityAnswer($data['parking_available'] ?? ''),
+            'parking_type' => $this->allowedValue($data['parking_type'] ?? '', ['schoolyard', 'parking_lot', 'street', 'other']),
+            'parking_location' => sanitize_text_field((string) ($data['parking_location'] ?? '')),
             'indoor_room_available' => $this->availabilityAnswer($data['indoor_room_available'] ?? ''),
+            'venue_type' => $this->allowedValue($data['venue_type'] ?? '', ['indoor', 'outdoor', 'both']),
+            'indoor_room_description' => sanitize_textarea_field((string) ($data['indoor_room_description'] ?? '')),
+            'outdoor_area_description' => sanitize_textarea_field((string) ($data['outdoor_area_description'] ?? '')),
             'bad_weather_option_available' => $this->availabilityAnswer($data['bad_weather_option_available'] ?? ''),
             'electricity_available' => $this->availabilityAnswer($data['electricity_available'] ?? ''),
             'water_available' => $this->availabilityAnswer($data['water_available'] ?? ''),
@@ -316,11 +348,20 @@ final class RequestRepository
             'contact_last_name' => '',
             'contact_email' => '',
             'contact_phone' => '',
+            'contact_role' => '',
+            'institution_website' => '',
             'street' => '',
             'house_number' => '',
             'accessibility_notes' => '',
             'group_notes' => '',
             'general_notes' => '',
+            'school_needs' => '',
+            'school_schedule_notes' => '',
+            'event_child_age_range' => '',
+            'occasion_description' => '',
+            'indoor_room_description' => '',
+            'outdoor_area_description' => '',
+            'parking_location' => '',
             'privacy_consent' => 0,
             'updated_at' => current_time('mysql'),
             'closed_at' => current_time('mysql'),
@@ -383,5 +424,27 @@ final class RequestRepository
     {
         $value = sanitize_key((string) $value);
         return in_array($value, ['yes', 'no', 'unknown'], true) ? $value : 'unknown';
+    }
+
+    private function allowedValue(mixed $value, array $allowed): string
+    {
+        $value = sanitize_key((string) $value);
+        return in_array($value, $allowed, true) ? $value : '';
+    }
+
+    private function positiveIntOrNull(mixed $value): ?int
+    {
+        if ($value === '' || $value === null) {
+            return null;
+        }
+        return max(1, (int) $value);
+    }
+
+    private function nonNegativeIntOrNull(mixed $value): ?int
+    {
+        if ($value === '' || $value === null) {
+            return null;
+        }
+        return max(0, (int) $value);
     }
 }

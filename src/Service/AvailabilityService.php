@@ -51,13 +51,13 @@ final class AvailabilityService
                 $result[] = [
                     'date' => $date,
                     'public_state' => CalendarState::WALK_IN,
-                    'public_label' => $title !== '' ? $title : 'Walk-in-Event',
+                    'public_label' => 'Öffentliches Event',
                     'public_city' => '',
                     'is_weekend' => $isWeekend,
                     'is_selectable' => false,
                     'is_interactive' => true,
                     'public_event' => [
-                        'title' => $title !== '' ? $title : 'Walk-in-Event',
+                        'title' => $title !== '' ? $title : 'Öffentliches Event',
                         'description' => (string) ($row['public_description'] ?? ''),
                         'location' => (string) ($row['public_location'] ?? ''),
                         'url' => (string) ($row['public_url'] ?? ''),
@@ -100,7 +100,7 @@ final class AvailabilityService
         return match ($state) {
             CalendarState::LIMITED => 'Auf Anfrage',
             CalendarState::UNAVAILABLE => 'Nicht buchbar',
-            default => 'Buchbar',
+            default => 'Noch verfügbar',
         };
     }
 

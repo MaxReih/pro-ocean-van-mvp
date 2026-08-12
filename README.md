@@ -20,12 +20,14 @@ Der einmalige WordPress-Start kann je nach Gerät und Verbindung etwas dauern; d
 ## Funktionsumfang
 
 - Route-first Buchungsoberfläche mit PLZ-Prüfung, Tourwochen und freien Alternativterminen
+- Dynamische Detailfragen für Schule, Veranstaltung und Sonstiges inklusive Zeitfenster, Teilnehmenden und Anforderungen vor Ort
 - Serverseitige Adressgeokodierung; Koordinaten und Kosten aus dem Browser werden nicht übernommen
 - Kostenoptimierte Wochenrouten über OSRM-Distanzmatrizen, Nearest Neighbour und 2-opt
 - Terminvorschläge aus Routenoptimierung, Wochenfüllung und regionaler Bündelung nach Bundesland
 - Login-geschütztes Van-Operations-Portal für Anfrage-Workflow, Tourplanung, Kalender und Statistik
 - Persönliche Rollen „Ocean Van Team“ und „Ocean Van Lesend“ mit getrennten Berechtigungen
 - ICS-Download und vorausgefüllter Google-Kalender-Link für bestätigte Termine
+- Direkte Google-Maps-Links für Tourstopps im Team-Portal
 
 ## Installation
 

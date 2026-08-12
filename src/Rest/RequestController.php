@@ -27,6 +27,8 @@ final class RequestController
     private const TEXT_LIMITS = [
         'institution_name' => 255,
         'institution_type' => 120,
+        'institution_website' => 500,
+        'contact_role' => 120,
         'contact_first_name' => 120,
         'contact_last_name' => 120,
         'contact_email' => 190,
@@ -41,6 +43,17 @@ final class RequestController
         'desired_date_from' => 10,
         'desired_date_to' => 10,
         'eligibility_token' => 20000,
+        'school_grade' => 40,
+        'school_needs' => 5000,
+        'school_schedule_notes' => 5000,
+        'event_child_age_range' => 120,
+        'occasion_description' => 5000,
+        'availability_window' => 32,
+        'parking_type' => 64,
+        'parking_location' => 500,
+        'venue_type' => 32,
+        'indoor_room_description' => 5000,
+        'outdoor_area_description' => 5000,
         'accessibility_notes' => 5000,
         'group_notes' => 5000,
         'general_notes' => 5000,
@@ -107,7 +120,7 @@ final class RequestController
         if (empty($payload['privacy_consent'])) {
             return 'Bitte bestätige die Datenschutzerklärung.';
         }
-        foreach (['institution_name', 'institution_type', 'contact_first_name', 'contact_last_name', 'contact_phone', 'street', 'house_number', 'city'] as $field) {
+        foreach (['institution_name', 'institution_type', 'contact_role', 'contact_first_name', 'contact_last_name', 'contact_phone', 'street', 'house_number', 'city'] as $field) {
             if (trim((string) ($payload[$field] ?? '')) === '') {
                 return 'Bitte fülle alle Pflichtfelder aus.';
             }
@@ -118,6 +131,10 @@ final class RequestController
         if (! is_email((string) ($payload['contact_email'] ?? ''))) {
             return 'Bitte prüfe die E-Mail-Adresse.';
         }
+        $website = trim((string) ($payload['institution_website'] ?? ''));
+        if ($website !== '' && ! wp_http_validate_url($website)) {
+            return 'Bitte prüfe die Website der Institution oder Organisation.';
+        }
         if (! preg_match('/^\d{5}$/', (string) ($payload['postal_code'] ?? ''))) {
             return 'Bitte prüfe die PLZ.';
         }
@@ -125,6 +142,31 @@ final class RequestController
         $adults = filter_var($payload['adult_count'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => self::MAX_PARTICIPANTS]]);
         if ($children === false || $adults === false || ($children + $adults) < 1 || ($children + $adults) > self::MAX_PARTICIPANTS) {
             return 'Bitte prüfe die Anzahl der Kinder und Erwachsenen.';
+        }
+        $institutionType = (string) ($payload['institution_type'] ?? '');
+        if (! in_array($institutionType, ['Schule', 'Veranstaltung', 'Sonstiges'], true)) {
+            return 'Bitte wähle eine Veranstaltungsart.';
+        }
+        if ($institutionType === 'Schule') {
+            $grades = ['preschool', 'grade_1', 'grade_2', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12', 'grade_13', 'vocational', 'mixed'];
+            $classCount = filter_var($payload['school_class_count'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 50]]);
+            $teachersPerClass = filter_var($payload['school_teachers_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 20]]);
+            $childrenPerClass = filter_var($payload['school_children_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
+            if (! in_array((string) ($payload['school_grade'] ?? ''), $grades, true) || $classCount === false || $teachersPerClass === false || $childrenPerClass === false) {
+                return 'Bitte prüfe Klassenstufe, Klassenanzahl und Gruppengröße.';
+            }
+            if ($children !== $classCount * $childrenPerClass || $adults < $classCount * $teachersPerClass) {
+                return 'Bitte prüfe die Teilnehmenden- und Lehrpersonalzahlen.';
+            }
+        }
+        if ($institutionType === 'Veranstaltung' && $children > 0 && trim((string) ($payload['event_child_age_range'] ?? '')) === '') {
+            return 'Bitte gib die Altersrange der teilnehmenden Kinder an.';
+        }
+        if ($institutionType === 'Sonstiges' && trim((string) ($payload['occasion_description'] ?? '')) === '') {
+            return 'Bitte beschreibe die Veranstaltungsart oder den Anlass.';
+        }
+        if (! in_array((string) ($payload['availability_window'] ?? ''), ['morning', 'afternoon', 'full_day'], true)) {
+            return 'Bitte wähle die zeitliche Verfügbarkeit.';
         }
         $mode = (string) ($payload['request_mode'] ?? 'date_range');
         if (! in_array($mode, ['specific_date', 'date_range'], true)) {
@@ -207,8 +249,24 @@ final class RequestController
             if (isset($payload[$field]) && ! is_scalar($payload[$field])) {
                 return 'Bitte beantworte alle Vor-Ort-Fragen.';
             }
-            if (! in_array((string) ($payload[$field] ?? ''), ['yes', 'no', 'unknown'], true)) {
+            if (! in_array((string) ($payload[$field] ?? ''), ['yes', 'no'], true)) {
                 return 'Bitte beantworte alle Vor-Ort-Fragen.';
+            }
+        }
+        $venueType = (string) ($payload['venue_type'] ?? '');
+        if (! in_array($venueType, ['indoor', 'outdoor', 'both'], true)) {
+            return 'Bitte wähle den vorgesehenen Einsatzbereich.';
+        }
+        if (in_array($venueType, ['indoor', 'both'], true) && trim((string) ($payload['indoor_room_description'] ?? '')) === '') {
+            return 'Bitte beschreibe die Räumlichkeit für den Inneneinsatz.';
+        }
+        if (in_array($venueType, ['outdoor', 'both'], true) && trim((string) ($payload['outdoor_area_description'] ?? '')) === '') {
+            return 'Bitte beschreibe die Fläche für den Außeneinsatz.';
+        }
+        if ((string) ($payload['parking_available'] ?? '') === 'yes') {
+            if (! in_array((string) ($payload['parking_type'] ?? ''), ['schoolyard', 'parking_lot', 'street', 'other'], true)
+                || trim((string) ($payload['parking_location'] ?? '')) === '') {
+                return 'Bitte ergänze Art und Lage des Van-Stellplatzes.';
             }
         }
 

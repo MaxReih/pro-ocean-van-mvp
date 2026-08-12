@@ -448,7 +448,7 @@
   function openWalkIn(date, row) {
     const dialog = $('[data-role="walk-in-dialog"]');
     const event = row && row.public_event ? row.public_event : {};
-    $('[data-role="walk-in-title"]').textContent = event.title || row.public_label || 'Walk-in-Event';
+    $('[data-role="walk-in-title"]').textContent = event.title || row.public_label || 'Öffentliches Event';
     $('[data-role="walk-in-date"]').textContent = formatDate(date);
     $('[data-role="walk-in-description"]').textContent = event.description || 'Kommt gerne vorbei.';
     const location = $('[data-role="walk-in-location"]');
@@ -606,6 +606,37 @@
     }
   }
 
+  function toggleConditionalSection(section, visible, requiredAttribute) {
+    section.hidden = !visible;
+    $$('input, select, textarea', section).forEach(function (field) {
+      field.disabled = !visible;
+      field.required = visible && field.hasAttribute(requiredAttribute);
+    });
+  }
+
+  function updateEventTypeSections() {
+    const type = form.elements.institution_type.value;
+    $$('[data-event-section]', form).forEach(function (section) {
+      toggleConditionalSection(section, section.dataset.eventSection === type, 'data-type-required');
+    });
+    syncParticipantTotal();
+  }
+
+  function updateVenueSections() {
+    const venue = form.elements.venue_type.value;
+    $$('[data-venue-section]', form).forEach(function (section) {
+      const sectionType = section.dataset.venueSection;
+      const visible = venue === 'both' || venue === sectionType;
+      toggleConditionalSection(section, visible, 'data-venue-required');
+    });
+  }
+
+  function updateParkingDetails() {
+    const details = $('[data-parking-details]', form);
+    const visible = radioValue('parking_available') === 'yes';
+    toggleConditionalSection(details, visible, 'data-parking-required');
+  }
+
   function clearStepErrors(fieldset) {
     $$('.pov-error', fieldset).forEach(function (element) { element.remove(); });
     $$('[aria-invalid="true"]', fieldset).forEach(function (element) {
@@ -628,8 +659,8 @@
     });
     const uniqueInvalid = Array.from(new Set(invalid.filter(Boolean)));
     if (step === 1 && Number(form.elements.participant_total.value || 0) < 1) {
-      uniqueInvalid.push(form.elements.children_count);
-      uniqueInvalid.push(form.elements.adult_count);
+      const participantField = $('[data-participant-field]:not(:disabled)', fieldset);
+      if (participantField) uniqueInvalid.push(participantField);
     }
     if (!uniqueInvalid.length) return true;
 
@@ -670,12 +701,15 @@
   }
 
   function renderSummary() {
-    const weather = radioValue('weather_option');
+    const availabilityLabels = { morning: 'Vormittag', afternoon: 'Nachmittag', full_day: 'Ganztägig' };
+    const venueLabels = { indoor: 'Innenraum', outdoor: 'Außenbereich', both: 'Innen- und Außenbereich' };
+    const venue = form.elements.venue_type.value;
     const onsite = [
+      availabilityLabels[form.elements.availability_window.value] || 'Zeit noch offen',
+      venueLabels[venue] || 'Einsatzbereich noch offen',
       'Parkplatz: ' + answerLabel(radioValue('parking_available')),
       'Strom: ' + answerLabel(radioValue('electricity_available')),
-      'Wasser: ' + answerLabel(radioValue('water_available')),
-      'Innenraum: ' + answerLabel(weather)
+      'Wasser: ' + answerLabel(radioValue('water_available'))
     ].join(' · ');
     $('[data-role="summary-content"]').innerHTML =
       '<div class="pov-summary-row"><div><strong>' + escapeHtml(selectedDateLabel()) + '</strong><span>' +
@@ -683,8 +717,7 @@
       escapeHtml(form.elements.institution_type.value || 'Noch offen') + '<br>' +
       escapeHtml(form.elements.street.value + ' ' + form.elements.house_number.value) + ', ' +
       escapeHtml(form.elements.postal_code.value + ' ' + form.elements.city.value) + '<br>' +
-      escapeHtml(form.elements.participant_total.value || '0') + ' Teilnehmende · ' +
-      escapeHtml(form.elements.target_group.value || 'Noch offen') +
+      escapeHtml(form.elements.participant_total.value || '0') + ' Teilnehmende' +
       '</span></div><button type="button" data-edit-step="1" aria-label="Kontakt und Gruppe ändern">Ändern</button></div>' +
       '<div class="pov-summary-row"><div><strong>Vor Ort</strong><span>' +
       escapeHtml(onsite) +
@@ -732,24 +765,68 @@
     }
   }
 
-  function gradeForTarget(target) {
-    return target === 'Weiterführende Schule' ? 5 : 1;
+  function gradeForSchool(value) {
+    const match = String(value || '').match(/^grade_(\d+)$/);
+    return match ? Math.max(1, Math.min(6, Number(match[1]))) : 1;
+  }
+
+  function participantCounts() {
+    const type = form.elements.institution_type.value;
+    if (type === 'Schule') {
+      const classCount = Math.max(0, Number(form.elements.school_class_count.value || 0));
+      const childrenPerClass = Math.max(0, Number(form.elements.school_children_per_class.value || 0));
+      const teachersPerClass = Math.max(0, Number(form.elements.school_teachers_per_class.value || 0));
+      const adults = Math.max(0, Number(form.elements.school_adult_count.value || 0));
+      const adultMinimum = classCount * teachersPerClass;
+      form.elements.school_adult_count.min = String(adultMinimum);
+      form.elements.school_adult_count.setCustomValidity(adults < adultMinimum ? 'Bitte berücksichtigt mindestens das angegebene Lehrpersonal.' : '');
+      return { children: classCount * childrenPerClass, adults: adults };
+    }
+    if (type === 'Veranstaltung') {
+      const children = Math.max(0, Number(form.elements.event_children_count.value || 0));
+      form.elements.event_child_age_range.required = children > 0;
+      return {
+        children: children,
+        adults: Math.max(0, Number(form.elements.event_adult_count.value || 0))
+      };
+    }
+    form.elements.event_child_age_range.required = false;
+    if (type === 'Sonstiges') {
+      return {
+        children: Math.max(0, Number(form.elements.other_children_count.value || 0)),
+        adults: Math.max(0, Number(form.elements.other_adult_count.value || 0))
+      };
+    }
+    return { children: 0, adults: 0 };
   }
 
   function collectPayload() {
     const data = new FormData(form);
-    const weather = data.get('weather_option') || '';
-    const target = String(data.get('target_group') || 'Gruppe');
-    const participantCount = String(data.get('participant_total') || '0');
+    const counts = participantCounts();
+    const type = String(data.get('institution_type') || '');
+    const participantCount = Number(data.get('participant_total') || 0);
+    const venue = String(data.get('venue_type') || '');
+    const outdoor = venue === 'outdoor' || venue === 'both';
     const payload = {
       website: data.get('website') || '',
       form_started_at: state.startedAt,
       request_mode: state.mode,
       institution_name: data.get('institution_name') || '',
-      institution_type: data.get('institution_type') || '',
-      children_count: Number(data.get('children_count') || 0),
-      adult_count: Number(data.get('adult_count') || 0),
-      participant_total: Number(data.get('participant_total') || 0),
+      institution_type: type,
+      institution_website: data.get('institution_website') || '',
+      contact_role: data.get('contact_role') || '',
+      children_count: counts.children,
+      adult_count: counts.adults,
+      participant_total: participantCount,
+      school_grade: type === 'Schule' ? data.get('school_grade') || '' : '',
+      school_class_count: type === 'Schule' ? Number(data.get('school_class_count') || 0) : '',
+      school_teachers_per_class: type === 'Schule' ? Number(data.get('school_teachers_per_class') || 0) : '',
+      school_children_per_class: type === 'Schule' ? Number(data.get('school_children_per_class') || 0) : '',
+      school_needs: type === 'Schule' ? data.get('school_needs') || '' : '',
+      school_schedule_notes: type === 'Schule' ? data.get('school_schedule_notes') || '' : '',
+      event_child_age_range: type === 'Veranstaltung' ? data.get('event_child_age_range') || '' : '',
+      occasion_description: type === 'Sonstiges' ? data.get('occasion_description') || '' : '',
+      availability_window: data.get('availability_window') || '',
       contact_first_name: data.get('contact_first_name') || '',
       contact_last_name: data.get('contact_last_name') || '',
       contact_email: data.get('contact_email') || '',
@@ -766,16 +843,21 @@
       desired_date_to: state.mode === 'date_range' ? state.rangeTo : '',
       possible_weekdays: state.mode === 'date_range' ? state.possibleWeekdays : [],
       parking_available: data.get('parking_available') || '',
+      parking_type: radioValue('parking_available') === 'yes' ? data.get('parking_type') || '' : '',
+      parking_location: radioValue('parking_available') === 'yes' ? data.get('parking_location') || '' : '',
       electricity_available: data.get('electricity_available') || '',
       water_available: data.get('water_available') || '',
-      indoor_room_available: weather,
-      bad_weather_option_available: weather,
-      accessibility_notes: '',
-      group_notes: '',
+      venue_type: venue,
+      indoor_room_available: venue === 'indoor' || venue === 'both' ? 'yes' : 'no',
+      indoor_room_description: venue === 'indoor' || venue === 'both' ? data.get('indoor_room_description') || '' : '',
+      outdoor_area_description: outdoor ? data.get('outdoor_area_description') || '' : '',
+      bad_weather_option_available: outdoor ? radioValue('bad_weather_option_available') : 'yes',
+      accessibility_notes: type === 'Schule' ? data.get('school_needs') || '' : '',
+      group_notes: type === 'Schule' ? data.get('school_needs') || '' : (type === 'Sonstiges' ? data.get('occasion_description') || '' : ''),
       general_notes: data.get('general_notes') || '',
       classes: [{
-        class_name: target,
-        grade: gradeForTarget(target),
+        class_name: type || 'Gruppe',
+        grade: type === 'Schule' ? gradeForSchool(data.get('school_grade')) : 1,
         participant_count: participantCount
       }]
     };
@@ -882,12 +964,17 @@
   form.elements.postal_code.addEventListener('input', trackFormRegionChange);
   form.elements.state_code.addEventListener('change', trackFormRegionChange);
   function syncParticipantTotal() {
-    const children = Math.max(0, Number(form.elements.children_count.value || 0));
-    const adults = Math.max(0, Number(form.elements.adult_count.value || 0));
-    form.elements.participant_total.value = String(children + adults);
+    const counts = participantCounts();
+    form.elements.participant_total.value = String(counts.children + counts.adults);
   }
-  form.elements.children_count.addEventListener('input', syncParticipantTotal);
-  form.elements.adult_count.addEventListener('input', syncParticipantTotal);
+  form.elements.institution_type.addEventListener('change', updateEventTypeSections);
+  $$('[data-participant-field], input[name="school_class_count"], input[name="school_teachers_per_class"]', form).forEach(function (field) {
+    field.addEventListener('input', syncParticipantTotal);
+  });
+  form.elements.venue_type.addEventListener('change', updateVenueSections);
+  $$('input[name="parking_available"]', form).forEach(function (field) {
+    field.addEventListener('change', updateParkingDetails);
+  });
   ['street', 'house_number', 'city'].forEach(function (name) {
     form.elements[name].addEventListener('change', trackAddressChange);
   });
@@ -914,6 +1001,8 @@
   rangeTo.max = iso(horizon);
   rangeTo.value = iso(defaultTo);
   $$('[data-range-weekday]').forEach(function (field) { field.checked = true; });
-  syncParticipantTotal();
+  updateEventTypeSections();
+  updateVenueSections();
+  updateParkingDetails();
   loadCalendar();
 })();

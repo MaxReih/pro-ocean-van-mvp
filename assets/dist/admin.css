@@ -401,6 +401,7 @@
 .pov-tour-stop time span { font-size: 9px; }
 .pov-tour-stop > div > strong { font-size: 13px; }
 .pov-tour-stop > div > span { color: var(--pov-muted); font-size: 10px; }
+.pov-tour-stop-actions { display: flex !important; flex-wrap: wrap; gap: 6px !important; justify-content: flex-end; }
 .pov-tour-stop.is-confirmed { border-color: #dac187; background: #fffdf7; }
 .pov-tour-stop.is-confirmed time { color: var(--pov-dark); background: var(--pov-sand); }
 .pov-tour-overnight { margin: 8px 0 0; padding: 10px 14px 10px 0; background: var(--pov-blue-soft); border-radius: 10px; }
@@ -529,5 +530,5 @@
   .pov-stat-period-grid > div:last-of-type { border-bottom: 0; }
   .pov-stat-costs { grid-template-columns: 1fr; }
   .pov-tour-stop { grid-template-columns: 48px minmax(0, 1fr); }
-  .pov-tour-stop > a { grid-column: 2; width: fit-content; }
+  .pov-tour-stop-actions { grid-column: 2; justify-content: flex-start; }
 }

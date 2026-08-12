@@ -6,7 +6,7 @@ Zeigt Kennzahlen, nächste bestätigte Termine und neue Anfragen.
 
 ## Anfragen
 
-Die Inbox kann nach Status, Arbeitszustand, Bundesland und Anfrageart gefiltert und durchsucht werden. Die Detailansicht bündelt Route und Kosten, Warnhinweise, Klassen, Infrastruktur, interne Notiz, Workflow, Vorschlagsmail, Terminbestätigung und Datenschutzaktionen. Vor Versand oder Bestätigung prüft das System den Termin erneut gegen Anfragezeitraum, Kalender und vorhandene Termine.
+Die Inbox kann nach Status, Arbeitszustand, Bundesland und Veranstaltungsart gefiltert und durchsucht werden. Die Detailansicht bündelt Route und Kosten, Warnhinweise, Klassen, Infrastruktur, interne Notiz, Workflow, Vorschlagsmail, Terminbestätigung und Datenschutzaktionen. Vor Versand oder Bestätigung prüft das System den Termin erneut gegen Anfragezeitraum, Kalender und vorhandene Termine.
 
 ## Kalender
 

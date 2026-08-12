@@ -946,6 +946,58 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
   border-top: 1px solid var(--pov-mist);
 }
 
+.pov-type-section,
+.pov-detail-block {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--pov-ice);
+  border: 1px solid var(--pov-mist);
+  border-radius: var(--pov-radius);
+}
+
+.pov-type-section > h2,
+.pov-detail-block > h2 {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+}
+
+.pov-type-section textarea,
+.pov-detail-block textarea {
+  min-height: 96px;
+}
+
+.pov-participant-total {
+  max-width: calc(50% - 7px);
+  margin-top: 16px;
+}
+
+.pov-participant-total input {
+  background: var(--pov-ice);
+  font-weight: 800;
+}
+
+.pov-planning-note {
+  margin: 16px 0 0;
+  padding: 13px 15px;
+  color: var(--pov-ink);
+  background: rgba(245, 219, 162, .48);
+  border-radius: var(--pov-radius-sm);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.pov-venue-details {
+  margin-top: 14px;
+}
+
+.pov-parking-block {
+  margin-bottom: 22px;
+}
+
+.pov-parking-block .pov-fieldset-intro {
+  margin-bottom: 16px;
+}
+
 .pov-selected-slot {
   display: flex;
   gap: 12px;
@@ -1304,6 +1356,10 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
   .pov-region,
   .pov-grid-2 {
     grid-template-columns: 1fr;
+  }
+
+  .pov-participant-total {
+    max-width: none;
   }
 
   .pov-span-2 {
