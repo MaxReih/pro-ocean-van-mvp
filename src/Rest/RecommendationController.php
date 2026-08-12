@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ProOceanVan\Rest;
 
 use ProOceanVan\Service\PublicRecommendationService;
+use ProOceanVan\Security\FrontendAccess;
 use WP_Error;
 use WP_REST_Request;
 
@@ -17,7 +18,7 @@ final class RecommendationController
         register_rest_route($this->namespace, '/recommendations', [
             'methods' => 'POST',
             'callback' => [$this, 'recommend'],
-            'permission_callback' => '__return_true',
+            'permission_callback' => [FrontendAccess::class, 'authorizeRest'],
         ]);
     }
 

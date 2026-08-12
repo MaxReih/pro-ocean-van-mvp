@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ProOceanVan\Rest;
 
 use ProOceanVan\Service\AvailabilityService;
+use ProOceanVan\Security\FrontendAccess;
 use DateTimeImmutable;
 use WP_Error;
 use WP_REST_Request;
@@ -18,7 +19,7 @@ final class PublicCalendarController
         register_rest_route($this->namespace, '/calendar', [
             'methods' => 'GET',
             'callback' => [$this, 'calendar'],
-            'permission_callback' => '__return_true',
+            'permission_callback' => [FrontendAccess::class, 'authorizeRest'],
             'args' => [
                 'start' => ['sanitize_callback' => 'sanitize_text_field'],
                 'end' => ['sanitize_callback' => 'sanitize_text_field'],

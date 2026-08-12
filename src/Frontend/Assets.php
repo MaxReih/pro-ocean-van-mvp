@@ -43,8 +43,6 @@ final class Assets
         if ($this->shouldLoad || is_admin()) {
             wp_enqueue_style('pov-calendar');
             wp_enqueue_style('pov-frontend');
-            wp_enqueue_script('pov-calendar');
-            wp_enqueue_script('pov-frontend');
         }
     }
 }

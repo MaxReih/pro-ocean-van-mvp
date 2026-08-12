@@ -12,6 +12,7 @@ use ProOceanVan\Repository\StateRepository;
 use ProOceanVan\Service\EligibilityTokenService;
 use ProOceanVan\Service\MailService;
 use ProOceanVan\Service\RequestRoutingService;
+use ProOceanVan\Security\FrontendAccess;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -68,7 +69,7 @@ final class RequestController
         register_rest_route($this->namespace, '/requests', [
             'methods' => 'POST',
             'callback' => [$this, 'create'],
-            'permission_callback' => '__return_true',
+            'permission_callback' => [FrontendAccess::class, 'authorizeRest'],
         ]);
     }
 
@@ -259,16 +260,19 @@ final class RequestController
         if (! in_array($venueType, ['indoor', 'outdoor', 'both'], true)) {
             return 'Bitte wähle den vorgesehenen Einsatzbereich.';
         }
-        if (in_array($venueType, ['outdoor', 'both'], true)) {
-            foreach (['bad_weather_option_available', 'electricity_outdoor_available'] as $field) {
-                if (($payload[$field] ?? '') !== '' && ! in_array((string) $payload[$field], ['yes', 'no'], true)) {
-                    return 'Bitte prüfe die Angaben zum Außenbereich.';
-                }
-            }
+        if (in_array($venueType, ['outdoor', 'both'], true)
+            && ($payload['bad_weather_option_available'] ?? '') !== ''
+            && ! in_array((string) $payload['bad_weather_option_available'], ['yes', 'no'], true)) {
+            return 'Bitte prüfe die Angaben zum Außenbereich.';
+        }
+        $outdoorPowerDistance = $payload['electricity_outdoor_distance_m'] ?? '';
+        if ($outdoorPowerDistance !== ''
+            && filter_var($outdoorPowerDistance, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 5000]]) === false) {
+            return 'Bitte prüfe die Entfernung zum Stromanschluss.';
         }
         $parkingType = (string) ($payload['parking_type'] ?? '');
-        if ($parkingType !== '' && ! in_array($parkingType, ['schoolyard', 'parking_lot', 'street', 'other'], true)) {
-            return 'Bitte prüfe die Art des Stellplatzes.';
+        if (! in_array($parkingType, ['schoolyard', 'parking_lot', 'street', 'other'], true)) {
+            return 'Bitte wähle die Art des Stellplatzes.';
         }
         $parkingLocation = trim((string) ($payload['parking_location'] ?? ''));
         if ($parkingLocation !== '' && ! $this->isGoogleMapsUrl($parkingLocation)) {

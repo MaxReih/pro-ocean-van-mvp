@@ -717,10 +717,14 @@
     const onsite = [
       availabilityLabels[form.elements.availability_window.value] || 'Zeit noch offen',
       venueLabels[venue] || 'Einsatzbereich noch offen',
+      form.elements.parking_type.options[form.elements.parking_type.selectedIndex]?.text || 'Stellplatz noch offen',
       form.elements.parking_location.value ? 'Stellplatz: Google-Maps-Link vorhanden' : 'Stellplatz: noch offen',
+      outdoor && form.elements.electricity_outdoor_distance_m.value
+        ? 'Strom Außenbereich: ' + form.elements.electricity_outdoor_distance_m.value + ' m'
+        : '',
       'Ladestrom: ' + answerLabel(radioValue('electricity_charging_available')),
       'Wasser: ' + answerLabel(radioValue('water_available'))
-    ].join(' · ');
+    ].filter(Boolean).join(' · ');
     $('[data-role="summary-content"]').innerHTML =
       '<div class="pov-summary-row"><div><strong>' + escapeHtml(selectedDateLabel()) + '</strong><span>' +
       escapeHtml(form.elements.institution_name.value || 'Noch offen') + ' · ' +
@@ -856,7 +860,8 @@
       parking_type: data.get('parking_type') || '',
       parking_location: data.get('parking_location') || '',
       electricity_available: data.get('electricity_charging_available') || '',
-      electricity_outdoor_available: outdoor ? radioValue('electricity_outdoor_available') : '',
+      electricity_outdoor_available: '',
+      electricity_outdoor_distance_m: outdoor ? data.get('electricity_outdoor_distance_m') || '' : '',
       electricity_charging_available: data.get('electricity_charging_available') || '',
       water_available: data.get('water_available') || '',
       changing_room_available: data.get('changing_room_available') || '',

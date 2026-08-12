@@ -512,6 +512,8 @@ final class Menu
         echo '<form method="post" enctype="multipart/form-data" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form" data-pov-settings-form>';
         wp_nonce_field('pov_save_settings');
         echo '<input type="hidden" name="action" value="pov_save_settings">';
+        $frontendProtected = (string) get_option('pov_frontend_password_enabled', '0') === '1';
+        echo '<div class="pov-settings-toggle"><div><strong>Buchungsseite schützen</strong><span>Aktiviert den Passwortzugang für Formular, Kalender und Routenvorschläge. Passwort: <code>Ocean</code></span></div><label class="pov-toggle"><input type="checkbox" name="pov_frontend_password_enabled" value="1" ' . checked(true, $frontendProtected, false) . '><span aria-hidden="true"></span><em>' . ($frontendProtected ? 'Aktiv' : 'Aus') . '</em></label></div>';
         $labels = $this->settingsFields();
         foreach ($this->settingsGroups() as $group => $names) {
             echo '<details class="pov-settings-group"' . ($group === 'Planung & Kosten' ? ' open' : '') . '><summary>' . esc_html($group) . '</summary><div>';
@@ -575,6 +577,7 @@ final class Menu
         }
         update_option('pov_routing_provider', sanitize_key((string) ($_POST['pov_routing_provider'] ?? 'null')));
         update_option('pov_geocoding_provider', sanitize_key((string) ($_POST['pov_geocoding_provider'] ?? 'null')));
+        update_option('pov_frontend_password_enabled', ! empty($_POST['pov_frontend_password_enabled']) ? '1' : '0');
         update_option('pov_test_profile_enabled', Activation::isTestProfileActive() ? '1' : '0');
         update_option('pov_cleanup_on_uninstall', ! empty($_POST['pov_cleanup_on_uninstall']) ? '1' : '0');
         $attachments = new AttachmentService();
@@ -1621,11 +1624,11 @@ final class Menu
         echo '<label>Altersrange Kinder <input name="event_child_age_range" value="' . esc_attr((string) ($request['event_child_age_range'] ?? '')) . '"></label><label>Veranstaltungsart / Anlass <textarea name="occasion_description">' . esc_textarea((string) ($request['occasion_description'] ?? '')) . '</textarea></label>';
         echo '<label>Hinweise <textarea name="general_notes">' . esc_textarea((string) ($request['general_notes'] ?? '')) . '</textarea></label>';
         echo '<fieldset><legend>Vor Ort</legend><div class="pov-admin-two">';
-        foreach (['bad_weather_option_available' => 'Schlechtwetter', 'electricity_outdoor_available' => 'Strom Außenbereich', 'electricity_charging_available' => 'Strom Technik', 'water_available' => 'Wasser', 'changing_room_available' => 'Umkleidekabine', 'shower_available' => 'Duschmöglichkeit', 'natural_water_nearby' => 'Fluss / See', 'wifi_available' => 'WLAN'] as $field => $label) {
+        foreach (['bad_weather_option_available' => 'Schlechtwetter', 'electricity_charging_available' => 'Strom Technik', 'water_available' => 'Wasser', 'changing_room_available' => 'Umkleidekabine', 'shower_available' => 'Duschmöglichkeit', 'natural_water_nearby' => 'Fluss / See', 'wifi_available' => 'WLAN'] as $field => $label) {
             $answer = in_array((string) ($request[$field] ?? ''), ['yes', 'no'], true) ? (string) $request[$field] : '';
             echo '<label>' . esc_html($label) . '<select name="' . esc_attr($field) . '">' . $this->options($answers, $answer) . '</select></label>';
         }
-        echo '</div><label>Zeitslot <select name="availability_window">' . $this->options(['' => 'Nicht erfasst', 'morning' => 'Vormittag', 'afternoon' => 'Nachmittag', 'full_day' => 'Ganztägig'], (string) ($request['availability_window'] ?? '')) . '</select></label><label>Einsatzbereich <select name="venue_type">' . $this->options(['' => 'Nicht erfasst', 'indoor' => 'Innenraum', 'outdoor' => 'Außenbereich', 'both' => 'Innen- und Außenbereich'], (string) ($request['venue_type'] ?? '')) . '</select></label><label>Beschreibung Räumlichkeit Innenraum-Veranstaltung <textarea name="indoor_room_description">' . esc_textarea((string) ($request['indoor_room_description'] ?? '')) . '</textarea></label><label>Beschreibung Räumlichkeit Außen-Veranstaltung <textarea name="outdoor_area_description">' . esc_textarea((string) ($request['outdoor_area_description'] ?? '')) . '</textarea></label><label>Stellplatzart <select name="parking_type">' . $this->options(['' => 'Nicht erfasst', 'schoolyard' => 'Schulhof', 'parking_lot' => 'Parkplatz', 'street' => 'Straßenrand / Ladezone', 'other' => 'Sonstiger Stellplatz'], (string) ($request['parking_type'] ?? '')) . '</select></label><label>Google-Maps-Link zum Stellplatz <input type="url" name="parking_location" value="' . esc_attr((string) ($request['parking_location'] ?? '')) . '"></label>';
+        echo '</div><label>Entfernung zum Stromanschluss im Außenbereich (Meter) <input type="number" min="0" max="5000" step="1" name="electricity_outdoor_distance_m" value="' . esc_attr((string) ($request['electricity_outdoor_distance_m'] ?? '')) . '"></label><label>Zeitslot <select name="availability_window">' . $this->options(['' => 'Nicht erfasst', 'morning' => 'Vormittag', 'afternoon' => 'Nachmittag', 'full_day' => 'Ganztägig'], (string) ($request['availability_window'] ?? '')) . '</select></label><label>Einsatzbereich <select name="venue_type">' . $this->options(['' => 'Nicht erfasst', 'indoor' => 'Innenraum', 'outdoor' => 'Außenbereich', 'both' => 'Innen- und Außenbereich'], (string) ($request['venue_type'] ?? '')) . '</select></label><label>Beschreibung Räumlichkeit Innenraum-Veranstaltung <textarea name="indoor_room_description">' . esc_textarea((string) ($request['indoor_room_description'] ?? '')) . '</textarea></label><label>Beschreibung Räumlichkeit Außen-Veranstaltung <textarea name="outdoor_area_description">' . esc_textarea((string) ($request['outdoor_area_description'] ?? '')) . '</textarea></label><label>Stellplatzart <select name="parking_type" required>' . $this->options(['' => 'Bitte wählen', 'schoolyard' => 'Schulhof', 'parking_lot' => 'Parkplatz', 'street' => 'Straßenrand / Ladezone', 'other' => 'Sonstiger Stellplatz'], (string) ($request['parking_type'] ?? '')) . '</select></label><label>Google-Maps-Link zum Stellplatz <input type="url" name="parking_location" value="' . esc_attr((string) ($request['parking_location'] ?? '')) . '"></label>';
         echo '<fieldset><legend>Präsentationstechnik</legend><div class="pov-choice-inline">';
         foreach (['chalkboard' => 'Kreidetafel', 'projector' => 'Beamer', 'digital_display' => 'Digitale Tafel / Screen', 'other' => 'Sonstiges'] as $value => $label) {
             echo '<label><input type="checkbox" name="presentation_equipment[]" value="' . esc_attr($value) . '" ' . checked(isset($presentationEquipment[$value]), true, false) . '> ' . esc_html($label) . '</label>';
@@ -1734,7 +1737,9 @@ final class Menu
             'WLAN' => $this->answerLabel((string) ($request['wifi_available'] ?? '')),
         ];
         if (in_array((string) ($request['venue_type'] ?? ''), ['outdoor', 'both'], true)) {
-            $facts['Strom Außenbereich'] = $this->answerLabel((string) ($request['electricity_outdoor_available'] ?? ''));
+            $facts['Stromanschluss Außenbereich'] = isset($request['electricity_outdoor_distance_m']) && $request['electricity_outdoor_distance_m'] !== null
+                ? (string) ((int) $request['electricity_outdoor_distance_m']) . ' m entfernt'
+                : 'Nicht erfasst';
             $facts['Schlechtwetteroption'] = $this->answerLabel((string) ($request['bad_weather_option_available'] ?? ''));
         }
         $presentation = $this->selectionLabels((string) ($request['presentation_equipment'] ?? ''), [
@@ -1818,7 +1823,6 @@ final class Menu
         ];
         if (in_array((string) ($request['venue_type'] ?? ''), ['outdoor', 'both'], true)) {
             $fields['bad_weather_option_available'] = 'Schlechtwetter';
-            $fields['electricity_outdoor_available'] = 'Strom Außenbereich';
         }
         $out = '<div class="pov-chip-list">';
         foreach ($fields as $field => $label) {

@@ -15,6 +15,7 @@ use ProOceanVan\Rest\RequestController;
 use ProOceanVan\Service\PrivacyService;
 use ProOceanVan\Service\PublicSuggestionResponseService;
 use ProOceanVan\Service\AttachmentService;
+use ProOceanVan\Security\FrontendAccess;
 
 final class Plugin
 {
@@ -43,6 +44,7 @@ final class Plugin
         Activation::applyTestProfileIfUnconfigured();
 
         (new Assets())->register();
+        (new FrontendAccess())->register();
         (new Shortcode())->register();
         (new Menu())->register();
         (new OperationsPortal())->register();

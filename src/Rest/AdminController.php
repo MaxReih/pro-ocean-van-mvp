@@ -195,6 +195,7 @@ final class AdminController
             'bad_weather_option_available' => (string) ($item['bad_weather_option_available'] ?? ''),
             'electricity_available' => (string) ($item['electricity_available'] ?? ''),
             'electricity_outdoor_available' => (string) ($item['electricity_outdoor_available'] ?? ''),
+            'electricity_outdoor_distance_m' => isset($item['electricity_outdoor_distance_m']) ? (int) $item['electricity_outdoor_distance_m'] : null,
             'electricity_charging_available' => (string) ($item['electricity_charging_available'] ?? ''),
             'water_available' => (string) ($item['water_available'] ?? ''),
             'changing_room_available' => (string) ($item['changing_room_available'] ?? ''),

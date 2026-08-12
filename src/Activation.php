@@ -247,6 +247,7 @@ final class Activation
             'pov_question_attachment_ids' => '',
             'pov_reject_attachment_ids' => '',
             'pov_privacy_page_url' => '',
+            'pov_frontend_password_enabled' => '0',
             'pov_cleanup_on_uninstall' => '0',
             'pov_test_profile_enabled' => '0',
             'pov_test_profile_applied' => '0',

@@ -315,14 +315,9 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         </div>
                     </fieldset>
                 <?php endforeach; ?>
-                <fieldset class="pov-choice-fieldset pov-question" data-venue-section="outdoor" hidden>
-                    <legend>Stromanschluss in der Nähe des Außenbereichs</legend>
-                    <div>
-                        <label><input type="radio" name="electricity_outdoor_available" value="yes"><span>Ja</span></label>
-                        <label><input type="radio" name="electricity_outdoor_available" value="no"><span>Nein</span></label>
-                    </div>
-                    <small>Maximale Entfernung entsprechend der verfügbaren Kabeltrommel.</small>
-                </fieldset>
+                <label class="pov-question pov-distance-field" data-venue-section="outdoor" hidden>Entfernung zum Stromanschluss im Außenbereich (Meter)
+                    <input type="number" min="0" max="5000" step="1" inputmode="numeric" name="electricity_outdoor_distance_m" placeholder="z. B. 15">
+                </label>
                 <fieldset class="pov-choice-fieldset pov-question">
                     <legend>Strom zum Laden der Technik
                         <span class="pov-info-tip" tabindex="0" aria-label="Hinweis zum Stromanschluss">i<span role="tooltip">Für Laptop, VR-Technik, Wechselakkus und weitere Geräte.</span></span>
@@ -340,8 +335,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </h2>
                 <div class="pov-grid-2">
                     <label>Art des Stellplatzes
-                        <select name="parking_type">
-                            <option value="">Optional auswählen</option>
+                        <select name="parking_type" required>
+                            <option value="">Bitte auswählen</option>
                             <option value="schoolyard">Schulhof</option>
                             <option value="parking_lot">Parkplatz</option>
                             <option value="street">Straßenrand / Ladezone</option>

@@ -28,6 +28,7 @@ Der einmalige WordPress-Start kann je nach Gerät und Verbindung etwas dauern; d
 - Persönliche Rollen „Ocean Van Team“ und „Ocean Van Lesend“ mit getrennten Berechtigungen
 - ICS-Download und vorausgefüllter Google-Kalender-Link für bestätigte Termine
 - Direkte Google-Maps-Links für Tourstopps im Team-Portal
+- Zuschaltbarer Passwortschutz für die öffentliche Buchung inklusive ihrer API-Aufrufe
 
 ## Installation
 
@@ -37,6 +38,8 @@ Der einmalige WordPress-Start kann je nach Gerät und Verbindung etwas dauern; d
 4. Unter `Benutzer` die Rolle `Ocean Van Team` oder `Ocean Van Lesend` zuweisen.
 5. Das Team arbeitet unter `/van-operations/`; technische Einstellungen bleiben in WordPress.
 6. Shortcode `[pro_ocean_van_booking]` auf einer Seite einfügen.
+
+Optional kann unter `Ocean Van > Einstellungen` die Buchungsseite mit dem Passwort `Ocean` geschützt werden.
 
 ## Hybrides Betriebsmodell
 

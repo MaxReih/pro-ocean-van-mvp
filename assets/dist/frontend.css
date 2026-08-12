@@ -15,9 +15,12 @@
   --pov-shadow: 0 18px 48px rgba(0, 56, 82, .1);
 }
 
-body:has(.pov-booking) .wp-block-post-title { display: none; }
-body:has(.pov-booking) #wp--skip-link--target { margin-top: 0 !important; }
-body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0 !important; padding-bottom: 24px !important; }
+body:has(.pov-booking) .wp-block-post-title,
+body:has(.pov-access-gate) .wp-block-post-title { display: none; }
+body:has(.pov-booking) #wp--skip-link--target,
+body:has(.pov-access-gate) #wp--skip-link--target { margin-top: 0 !important; }
+body:has(.pov-booking) #wp--skip-link--target > .wp-block-group,
+body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-top: 0 !important; padding-bottom: 24px !important; }
 
 .pov-booking,
 .pov-booking *,
@@ -1564,4 +1567,41 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+.pov-access-gate {
+  box-sizing: border-box;
+  width: min(560px, calc(100% - 32px));
+  margin: clamp(28px, 7vw, 90px) auto;
+  padding: clamp(26px, 5vw, 48px);
+  color: var(--pov-blue);
+  font-family: Quicksand, "Segoe UI", Arial, sans-serif;
+  background: #fff;
+  border: 1px solid rgba(0, 86, 125, .22);
+  border-radius: 24px;
+  box-shadow: 0 22px 55px rgba(0, 56, 82, .1);
+}
+
+.pov-access-gate * { box-sizing: border-box; }
+.pov-access-gate > img { width: 168px; height: auto; margin-bottom: 28px; }
+.pov-access-gate h1 { margin: 5px 0 24px; font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; }
+.pov-access-gate form { display: grid; gap: 8px; }
+.pov-access-gate label { font-size: .78rem; font-weight: 700; }
+.pov-access-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.pov-access-row input {
+  min-width: 0;
+  min-height: 52px;
+  padding: 10px 14px;
+  color: var(--pov-blue);
+  font: inherit;
+  background: #fff;
+  border: 1px solid rgba(0, 86, 125, .3);
+  border-radius: 12px;
+}
+.pov-access-row input:focus { outline: 3px solid rgba(31, 139, 164, .2); border-color: var(--pov-blue); }
+.pov-access-error { margin: 5px 0 0; color: #a52a2a; font-size: .88rem; font-weight: 700; }
+
+@media (max-width: 520px) {
+  .pov-access-row { grid-template-columns: 1fr; }
+  .pov-access-row .pov-button { width: 100%; }
 }

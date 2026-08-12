@@ -1,7 +1,8 @@
 # Annahmen
 
 - Das MVP wird als eigenständiges Plugin unter `wp-content/plugins/pro-ocean-van` installiert.
-- Operative Teamarbeit findet unter `/van-operations/` mit persönlichen WordPress-Konten statt; ein gemeinsames Seitenpasswort wird nicht verwendet.
+- Operative Teamarbeit findet unter `/van-operations/` mit persönlichen WordPress-Konten statt; der optionale gemeinsame Passwortschutz gilt ausschließlich für die öffentliche Buchungsseite und deren öffentliche API-Aufrufe.
+- Der Frontend-Passwortschutz ist nach Installation standardmäßig aus und kann von Administratoren aktiviert werden. Das vereinbarte Passwort lautet `Ocean`, die Freigabe gilt zwölf Stunden pro Browser.
 - Die Rolle `Ocean Van Team` bearbeitet Anfragen, Touren und Kalender. `Ocean Van Lesend` sieht Touren, Kalender und Statistik ohne Kontakte, Änderungen oder Kalenderexport.
 - Das WordPress-Backend bleibt Administratoren für Benutzerverwaltung und technische Einstellungen vorbehalten.
 - Die gelieferten SVG-Dateien `05_Pro_Ocean_Logo_Blau.svg` und `07_Pro_Ocean_Symbol_Blau.svg` sind unverändert unter `assets/brand/` eingebunden.

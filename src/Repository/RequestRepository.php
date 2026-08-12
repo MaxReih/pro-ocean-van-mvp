@@ -71,7 +71,8 @@ final class RequestRepository
             'outdoor_area_description' => sanitize_textarea_field((string) ($payload['outdoor_area_description'] ?? '')),
             'bad_weather_option_available' => $this->availabilityAnswer($payload['bad_weather_option_available'] ?? ''),
             'electricity_available' => $this->availabilityAnswer($payload['electricity_available'] ?? ''),
-            'electricity_outdoor_available' => $this->availabilityAnswer($payload['electricity_outdoor_available'] ?? ''),
+            'electricity_outdoor_available' => '',
+            'electricity_outdoor_distance_m' => $this->nonNegativeIntOrNull($payload['electricity_outdoor_distance_m'] ?? null),
             'electricity_charging_available' => $this->availabilityAnswer($payload['electricity_charging_available'] ?? ''),
             'water_available' => $this->availabilityAnswer($payload['water_available'] ?? ''),
             'changing_room_available' => $this->availabilityAnswer($payload['changing_room_available'] ?? ''),
@@ -267,6 +268,10 @@ final class RequestRepository
             || ($mode === 'date_range' && (! $from || ! $to || $from > $to || ! $weekdays))) {
             return false;
         }
+        $parkingType = $this->allowedValue($data['parking_type'] ?? '', ['schoolyard', 'parking_lot', 'street', 'other']);
+        if ($parkingType === '') {
+            return false;
+        }
 
         global $wpdb;
         $updated = $wpdb->update($wpdb->prefix . 'pov_requests', [
@@ -297,7 +302,7 @@ final class RequestRepository
             'contact_phone' => sanitize_text_field((string) ($data['contact_phone'] ?? '')),
             'general_notes' => sanitize_textarea_field((string) ($data['general_notes'] ?? '')),
             'parking_available' => $this->availabilityAnswer($data['parking_available'] ?? ''),
-            'parking_type' => $this->allowedValue($data['parking_type'] ?? '', ['schoolyard', 'parking_lot', 'street', 'other']),
+            'parking_type' => $parkingType,
             'parking_location' => esc_url_raw((string) ($data['parking_location'] ?? '')),
             'indoor_room_available' => $this->availabilityAnswer($data['indoor_room_available'] ?? ''),
             'venue_type' => $this->allowedValue($data['venue_type'] ?? '', ['indoor', 'outdoor', 'both']),
@@ -305,7 +310,8 @@ final class RequestRepository
             'outdoor_area_description' => sanitize_textarea_field((string) ($data['outdoor_area_description'] ?? '')),
             'bad_weather_option_available' => $this->availabilityAnswer($data['bad_weather_option_available'] ?? ''),
             'electricity_available' => $this->availabilityAnswer($data['electricity_available'] ?? ''),
-            'electricity_outdoor_available' => $this->availabilityAnswer($data['electricity_outdoor_available'] ?? ''),
+            'electricity_outdoor_available' => '',
+            'electricity_outdoor_distance_m' => $this->nonNegativeIntOrNull($data['electricity_outdoor_distance_m'] ?? null),
             'electricity_charging_available' => $this->availabilityAnswer($data['electricity_charging_available'] ?? ''),
             'water_available' => $this->availabilityAnswer($data['water_available'] ?? ''),
             'changing_room_available' => $this->availabilityAnswer($data['changing_room_available'] ?? ''),

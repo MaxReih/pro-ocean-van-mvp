@@ -3,7 +3,7 @@ Contributors: proocean
 Tags: booking, calendar, routing
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.8.2
+Stable tag: 0.8.3
 License: GPLv2 or later
 
 Route-first Ocean-Van-Buchung und kostenoptimierte Tourenplanung für WordPress.
@@ -21,6 +21,11 @@ Das Plugin stellt den Shortcode [pro_ocean_van_booking], routenoptimierte Termin
 5. Shortcode in eine Seite einfügen.
 
 == Changelog ==
+
+= 0.8.3 =
+* Optionaler Passwortschutz für Buchungsseite, Kalender, Routenvorschläge und Anfrageversand; der Backend-Schalter verwendet das vereinbarte Passwort „Ocean“.
+* Die Stellplatzart ist eine verpflichtende Auswahl, während der Google-Maps-Link freiwillig bleibt.
+* Der Stromanschluss am Außenbereich wird als optionale Entfernung in Metern statt als ungenaue Ja/Nein-Angabe erfasst.
 
 = 0.8.2 =
 * Vor-Ort-Angaben einschließlich Stellplatz und Google-Maps-Link sind optional; die Stellplatz-Ja/Nein-Frage entfällt.

@@ -9,7 +9,7 @@
 | Ocean Van Lesend | ja | nein | ja | ja | ja | nein | nein | nein |
 | Abonnent / ohne Van-Rolle | nein | nein | nein | nein | nein | nein | nein | nein |
 
-Jede Person verwendet ein eigenes WordPress-Konto. Ein gemeinsames Seitenpasswort ist nicht vorgesehen.
+Jede Person verwendet im Teamportal ein eigenes WordPress-Konto. Die öffentliche Buchungsseite kann zusätzlich über den Backend-Schalter mit dem Präsentationspasswort `Ocean` geschützt werden.
 
 ## Portal und Sicherheit
 
@@ -23,6 +23,8 @@ Jede Person verwendet ein eigenes WordPress-Konto. Ein gemeinsames Seitenpasswor
 8. Antwort-, Adress-, Tour- und Kalenderaktionen ohne gültigen Nonce oder ohne passende Capability absenden: Die Aktion wird abgewiesen.
 9. Portalantwort prüfen: `Cache-Control` verhindert privates Caching und `X-Robots-Tag` beziehungsweise das Robots-Meta-Tag stehen auf `noindex, nofollow`.
 10. Neue Anfrage auslösen und Team-Mail prüfen: Der Link öffnet die Anfrage unter `/van-operations/`, nicht in `wp-admin`.
+11. Unter `Ocean Van > Einstellungen` den Schalter „Buchungsseite schützen“ aktivieren: Buchungsseite und öffentliche REST-Endpunkte sind ohne Freigabe gesperrt.
+12. Ein falsches Passwort eingeben: Es erscheint eine eindeutige Fehlermeldung, ohne dass das Formular geladen wird. Mit `Ocean` öffnen: Kalender und Routenvorschläge funktionieren innerhalb derselben Sitzung.
 
 ## Buchung und Betrieb
 
@@ -31,7 +33,7 @@ Jede Person verwendet ein eigenes WordPress-Konto. Ein gemeinsames Seitenpasswor
 3. OSM-Testprofil prüfen: Nominatim, OSRM, Startpunkt Tübingen und `0,85 € / km` sind gesetzt.
 4. Mit aktivem Bundesland und gültiger PLZ `72072` auf `Termine prüfen` klicken: Die Route wird über Nominatim und OSRM geprüft.
 5. Wenn mehrere Werktage in einer guten Tourwoche liegen, `Diese Woche anfragen` wählen: Das Zeitraumformular öffnet sich mit Montag bis Freitag und übernimmt die PLZ.
-6. Eine Anfrage mit Zeitraum, mehreren Klassen und `Strom = Nein` absenden: Die Anfrage erscheint im Portal mit Warnhinweis.
+6. Eine Anfrage mit Zeitraum, mehreren Klassen, verpflichtender Stellplatzart und optionaler Entfernung zum Außen-Stromanschluss absenden: Die Angaben erscheinen im Portal.
 7. Prüfen, dass Mailpit eine Eingangsbestätigung erhält, sofern WordPress-Mail lokal auf Mailpit zeigt.
 8. Für die Anfrage Vorschläge neu berechnen: Maximal fünf Vorschläge werden angezeigt.
 9. Einen Vorschlag akzeptieren und die Vorschlagsmail senden: Die Mail enthält Schaltflächen zum Annehmen der vorgeschlagenen Termine.
