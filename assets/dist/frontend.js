@@ -632,12 +632,6 @@
     updateOtherFields();
   }
 
-  function updateParkingDetails() {
-    const details = $('[data-parking-details]', form);
-    const visible = radioValue('parking_available') === 'yes';
-    toggleConditionalSection(details, visible, 'data-parking-required');
-  }
-
   function updateOtherField(name) {
     const toggle = $('[data-toggle-other="' + name + '"]', form);
     const wrapper = $('[data-other-field="' + name + '"]', form);
@@ -723,7 +717,7 @@
     const onsite = [
       availabilityLabels[form.elements.availability_window.value] || 'Zeit noch offen',
       venueLabels[venue] || 'Einsatzbereich noch offen',
-      'Parkplatz: ' + answerLabel(radioValue('parking_available')),
+      form.elements.parking_location.value ? 'Stellplatz: Google-Maps-Link vorhanden' : 'Stellplatz: noch offen',
       'Ladestrom: ' + answerLabel(radioValue('electricity_charging_available')),
       'Wasser: ' + answerLabel(radioValue('water_available'))
     ].join(' · ');
@@ -858,9 +852,9 @@
       desired_date_from: state.mode === 'date_range' ? state.rangeFrom : '',
       desired_date_to: state.mode === 'date_range' ? state.rangeTo : '',
       possible_weekdays: state.mode === 'date_range' ? state.possibleWeekdays : [],
-      parking_available: data.get('parking_available') || '',
-      parking_type: radioValue('parking_available') === 'yes' ? data.get('parking_type') || '' : '',
-      parking_location: radioValue('parking_available') === 'yes' ? data.get('parking_location') || '' : '',
+      parking_available: '',
+      parking_type: data.get('parking_type') || '',
+      parking_location: data.get('parking_location') || '',
       electricity_available: data.get('electricity_charging_available') || '',
       electricity_outdoor_available: outdoor ? radioValue('electricity_outdoor_available') : '',
       electricity_charging_available: data.get('electricity_charging_available') || '',
@@ -980,7 +974,7 @@
     }
     if (target.dataset.editStep) setStep(Number(target.dataset.editStep), true);
     if (target.hasAttribute('data-focus-onsite')) {
-      const firstQuestion = $('input[name="parking_available"]', form);
+      const firstQuestion = $('select[name="parking_type"]', form);
       if (firstQuestion) firstQuestion.focus();
     }
   });
@@ -998,9 +992,6 @@
     field.addEventListener('input', syncParticipantTotal);
   });
   form.elements.venue_type.addEventListener('change', updateVenueSections);
-  $$('input[name="parking_available"]', form).forEach(function (field) {
-    field.addEventListener('change', updateParkingDetails);
-  });
   $$('[data-toggle-other]', form).forEach(function (field) {
     field.addEventListener('change', updateOtherFields);
   });
@@ -1032,7 +1023,6 @@
   $$('[data-range-weekday]').forEach(function (field) { field.checked = true; });
   updateEventTypeSections();
   updateVenueSections();
-  updateParkingDetails();
   updateOtherFields();
   loadCalendar();
 })();

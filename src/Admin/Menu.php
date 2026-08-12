@@ -376,8 +376,8 @@ final class Menu
                 $stopSummary .= ' · ' . (int) $cluster['confirmed_count'] . ' bestätigt';
             }
             $source = ['heigit' => 'HeiGIT-Straßenmatrix', 'osrm' => 'Straßenmatrix', 'estimated' => 'Geschätzte Fahrzeit'][(string) $cluster['matrix_source']] ?? 'Routendaten';
-            $tourMapsUrl = $this->tourMapsUrl($cluster, $stops);
-            echo '<article class="pov-route-cluster' . ($cluster['priority'] === 'recommended' ? ' is-recommended' : '') . '"><header><div><span class="pov-admin-eyebrow">' . esc_html(GermanDateFormatter::short((string) $cluster['week_start']) . ' – ' . GermanDateFormatter::short((string) $cluster['week_end'])) . '</span><h2>' . esc_html((string) $cluster['title']) . '</h2><p>' . esc_html($stopSummary . ' · Start ' . (string) $cluster['start_label']) . '</p></div><div class="pov-route-cluster-actions"><a class="button" href="' . esc_url($tourMapsUrl) . '" target="_blank" rel="noopener">Gesamte Tour in Google Maps</a><span class="pov-route-badge">' . ($cluster['priority'] === 'recommended' ? 'Empfohlen' : 'Entwurf') . '</span></div></header>';
+            $tourMapsUrl = $this->tourPoisUrl($stops);
+            echo '<article class="pov-route-cluster' . ($cluster['priority'] === 'recommended' ? ' is-recommended' : '') . '"><header><div><span class="pov-admin-eyebrow">' . esc_html(GermanDateFormatter::short((string) $cluster['week_start']) . ' – ' . GermanDateFormatter::short((string) $cluster['week_end'])) . '</span><h2>' . esc_html((string) $cluster['title']) . '</h2><p>' . esc_html($stopSummary . ' · Start ' . (string) $cluster['start_label']) . '</p></div><div class="pov-route-cluster-actions"><a class="button" href="' . esc_url($tourMapsUrl) . '" target="_blank" rel="noopener">Tourstopps als POIs in Google Maps</a><span class="pov-route-badge">' . ($cluster['priority'] === 'recommended' ? 'Empfohlen' : 'Entwurf') . '</span></div></header>';
             echo '<div class="pov-route-metrics"><div><span>Tourstrecke</span><strong>' . esc_html(number_format((float) $cluster['route_distance_km'], 0, ',', '.') . ' km') . '</strong><small>' . esc_html($source) . '</small></div><div><span>Fahrzeit</span><strong>' . esc_html($this->durationLabel((float) $cluster['route_duration_minutes'])) . '</strong><small>inklusive Rückfahrt</small></div><div><span>Fahrtkosten</span><strong>' . esc_html(number_format((float) $cluster['estimated_cost'], 2, ',', '.') . ' €') . '</strong></div><div><span>Übernachtung</span><strong>' . esc_html(number_format($overnightCost, 2, ',', '.') . ' €') . '</strong><small>Tour gesamt ' . esc_html(number_format((float) $cluster['estimated_cost'] + $overnightCost, 2, ',', '.') . ' €') . '</small></div></div>';
             echo '<div class="pov-tour-timeline"><div class="pov-tour-depot"><span>S</span><div><small>Start</small><strong>' . esc_html((string) $cluster['start_label']) . '</strong></div></div>';
             foreach ($stops as $index => $stop) {
@@ -415,24 +415,21 @@ final class Menu
         $this->footer();
     }
 
-    private function tourMapsUrl(array $cluster, array $stops): string
+    private function tourPoisUrl(array $stops): string
     {
-        $waypoints = [];
+        $pois = [];
         foreach ($stops as $stop) {
             $address = trim((string) ($stop['street'] ?? '') . ' ' . (string) ($stop['house_number'] ?? ''));
             $place = trim((string) ($stop['postal_code'] ?? '') . ' ' . (string) ($stop['city'] ?? ''));
-            $waypoints[] = trim($address . ($address !== '' && $place !== '' ? ', ' : '') . $place);
+            $label = trim((string) ($stop['institution_name'] ?? ''));
+            $pois[] = trim($label . ($label !== '' && ($address !== '' || $place !== '') ? ', ' : '') . $address . ($address !== '' && $place !== '' ? ', ' : '') . $place);
         }
-        $waypoints = array_values(array_filter($waypoints));
-        $start = trim((string) ($cluster['start_label'] ?? ''));
+        $pois = array_values(array_filter($pois));
 
         return add_query_arg([
             'api' => '1',
-            'origin' => $start,
-            'destination' => $start,
-            'waypoints' => implode('|', $waypoints),
-            'travelmode' => 'driving',
-        ], 'https://www.google.com/maps/dir/');
+            'query' => implode(' | ', $pois),
+        ], 'https://www.google.com/maps/search/');
     }
 
     private function tourExpensesPanel(array $expenses): string
@@ -1331,18 +1328,7 @@ final class Menu
 
     private function warningCount(array $request): int
     {
-        $count = 0;
-        $fields = ['parking_available', 'electricity_charging_available', 'water_available'];
-        if (in_array((string) ($request['venue_type'] ?? ''), ['outdoor', 'both'], true)) {
-            $fields[] = 'bad_weather_option_available';
-            $fields[] = 'electricity_outdoor_available';
-        }
-        foreach ($fields as $field) {
-            if (($request[$field] ?? 'unknown') !== 'yes') {
-                $count++;
-            }
-        }
-        return $count;
+        return 0;
     }
 
     private function calendarExportPanel(array $items): string
@@ -1631,11 +1617,11 @@ final class Menu
         echo '<div class="pov-admin-two"><label>Vorname <input name="contact_first_name" value="' . esc_attr((string) $request['contact_first_name']) . '" required></label><label>Nachname <input name="contact_last_name" value="' . esc_attr((string) $request['contact_last_name']) . '" required></label></div>';
         echo '<label>E-Mail <input type="email" name="contact_email" value="' . esc_attr((string) $request['contact_email']) . '" required></label><label>Telefon <input name="contact_phone" value="' . esc_attr((string) $request['contact_phone']) . '" required></label>';
         echo '<div class="pov-admin-two"><label>Funktion <input name="contact_role" value="' . esc_attr((string) ($request['contact_role'] ?? '')) . '"></label><label>Website <input type="url" name="institution_website" value="' . esc_attr((string) ($request['institution_website'] ?? '')) . '"></label></div>';
-        echo '<fieldset><legend>Schule</legend><div class="pov-admin-two"><label>Klassenstufe <select name="school_grade">' . $this->options($schoolGrades, (string) ($request['school_grade'] ?? '')) . '</select></label><label>Anzahl Klassen <input type="number" min="1" name="school_class_count" value="' . esc_attr((string) ($request['school_class_count'] ?? '')) . '"></label><label>Lehrpersonal / Klasse <input type="number" min="0" name="school_teachers_per_class" value="' . esc_attr((string) ($request['school_teachers_per_class'] ?? '')) . '"></label><label>Kinder / Klasse <input type="number" min="1" name="school_children_per_class" value="' . esc_attr((string) ($request['school_children_per_class'] ?? '')) . '"></label></div><label>Besondere Anforderungen <textarea name="school_needs">' . esc_textarea((string) ($request['school_needs'] ?? '')) . '</textarea></label><label>Klassenstunden und Pausen <textarea name="school_schedule_notes">' . esc_textarea((string) ($request['school_schedule_notes'] ?? '')) . '</textarea></label></fieldset>';
+        echo '<fieldset><legend>Schule</legend><div class="pov-admin-two"><label>Klassenstufe <select name="school_grade">' . $this->options($schoolGrades, (string) ($request['school_grade'] ?? '')) . '</select></label><label>Anzahl Klassen <input type="number" min="1" name="school_class_count" value="' . esc_attr((string) ($request['school_class_count'] ?? '')) . '"></label><label>Lehrpersonal / Klasse <input type="number" min="0" name="school_teachers_per_class" value="' . esc_attr((string) ($request['school_teachers_per_class'] ?? '')) . '"></label><label>Kinder / Klasse <input type="number" min="1" name="school_children_per_class" value="' . esc_attr((string) ($request['school_children_per_class'] ?? '')) . '"></label></div><label>Besondere Anforderungen <textarea name="school_needs">' . esc_textarea((string) ($request['school_needs'] ?? '')) . '</textarea></label><label>Hinweise / Wünsche zur zeitlichen Planung <textarea name="school_schedule_notes">' . esc_textarea((string) ($request['school_schedule_notes'] ?? '')) . '</textarea></label></fieldset>';
         echo '<label>Altersrange Kinder <input name="event_child_age_range" value="' . esc_attr((string) ($request['event_child_age_range'] ?? '')) . '"></label><label>Veranstaltungsart / Anlass <textarea name="occasion_description">' . esc_textarea((string) ($request['occasion_description'] ?? '')) . '</textarea></label>';
         echo '<label>Hinweise <textarea name="general_notes">' . esc_textarea((string) ($request['general_notes'] ?? '')) . '</textarea></label>';
         echo '<fieldset><legend>Vor Ort</legend><div class="pov-admin-two">';
-        foreach (['parking_available' => 'Parkplatz', 'bad_weather_option_available' => 'Schlechtwetter', 'electricity_outdoor_available' => 'Strom Außenbereich', 'electricity_charging_available' => 'Strom Technik', 'water_available' => 'Wasser', 'changing_room_available' => 'Umkleide', 'shower_available' => 'Dusche', 'natural_water_nearby' => 'Fluss / See', 'wifi_available' => 'WLAN'] as $field => $label) {
+        foreach (['bad_weather_option_available' => 'Schlechtwetter', 'electricity_outdoor_available' => 'Strom Außenbereich', 'electricity_charging_available' => 'Strom Technik', 'water_available' => 'Wasser', 'changing_room_available' => 'Umkleidekabine', 'shower_available' => 'Duschmöglichkeit', 'natural_water_nearby' => 'Fluss / See', 'wifi_available' => 'WLAN'] as $field => $label) {
             $answer = in_array((string) ($request[$field] ?? ''), ['yes', 'no'], true) ? (string) $request[$field] : '';
             echo '<label>' . esc_html($label) . '<select name="' . esc_attr($field) . '">' . $this->options($answers, $answer) . '</select></label>';
         }
@@ -1789,7 +1775,7 @@ final class Menu
         foreach ([
             'Anlass' => $request['occasion_description'] ?? '',
             'Besondere Anforderungen' => $request['school_needs'] ?? '',
-            'Klassenstunden und Pausen' => $request['school_schedule_notes'] ?? '',
+            'Hinweise / Wünsche zur zeitlichen Planung' => $request['school_schedule_notes'] ?? '',
             'Innenraum' => $request['indoor_room_description'] ?? '',
             'Außenfläche' => $request['outdoor_area_description'] ?? '',
             'Sonstige Präsentationstechnik' => $request['presentation_equipment_other'] ?? '',
@@ -1827,7 +1813,6 @@ final class Menu
     private function warnings(array $request): string
     {
         $fields = [
-            'parking_available' => 'Parkplatz',
             'electricity_charging_available' => 'Strom Technik',
             'water_available' => 'Wasser / Waschbecken',
         ];
@@ -1838,6 +1823,9 @@ final class Menu
         $out = '<div class="pov-chip-list">';
         foreach ($fields as $field => $label) {
             $value = (string) ($request[$field] ?? '');
+            if (! in_array($value, ['yes', 'no'], true)) {
+                continue;
+            }
             $out .= '<span class="pov-admin-chip ' . ($value === 'yes' ? 'is-ok' : 'is-warn') . '">' . esc_html($label . ': ' . $this->answerLabel($value)) . '</span>';
         }
         return $out . '</div>';
@@ -1845,7 +1833,7 @@ final class Menu
 
     private function answerLabel(string $value): string
     {
-        return ['yes' => 'Ja', 'no' => 'Nein', 'unknown' => 'Unklar'][$value] ?? 'Unklar';
+        return ['yes' => 'Ja', 'no' => 'Nein'][$value] ?? 'Nicht erfasst';
     }
 
     private function requestDateLabel(array $request): string

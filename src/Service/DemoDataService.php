@@ -28,7 +28,7 @@ final class DemoDataService
 {
     public const OPTION_KEY = 'pov_demo_data_manifest_v1';
 
-    private const MANIFEST_VERSION = 2;
+    private const MANIFEST_VERSION = 3;
     private const MARKER_PREFIX = 'POV_DEMO_DATA:';
 
     public function seed(): array
@@ -130,6 +130,7 @@ final class DemoDataService
                     ]
                 );
             }
+            $this->seedTourCalendar();
 
             $manifest['request_ids'] = $requestIds;
             $manifest['appointment_ids'] = $appointmentIds;
@@ -154,6 +155,81 @@ final class DemoDataService
             'created_request_ids' => $createdRequests,
             'created_appointment_ids' => $createdAppointments,
         ];
+    }
+
+    private function futureTourFixtures(): array
+    {
+        $stops = [
+            ['stuttgart_october', 'DEMO · HABA Familienzentrum', 'Schule', 'Riemerstraße', '10', '70839', 'Gerlingen', 'BW', 48.8007, 9.0636, '2026-10-14', 'Tourraum Stuttgart', EventType::SCHOOL, 32, 5],
+            ['schillerhoehe_november', 'DEMO · Schillerhöhe Bildungshaus', 'Schule', 'Schillerhöhe', '8', '71672', 'Marbach am Neckar', 'BW', 48.9391, 9.2590, '2026-11-11', 'Tourraum Stuttgart', EventType::SCHOOL, 28, 4],
+            ['frankfurt_january', 'DEMO · Mainufer Bildungstag', 'Veranstaltung', 'Schaumainkai', '1', '60596', 'Frankfurt am Main', 'HE', 50.1057, 8.6871, '2027-01-13', 'Route nach Norden', EventType::EVENT, 45, 18],
+            ['koeln_january', 'DEMO · Besuch bei No Köln', 'Veranstaltung', 'Rheinauhafen', '1', '50678', 'Köln', 'NW', 50.9246, 6.9610, '2027-01-15', 'Route nach Norden', EventType::EVENT, 38, 22],
+            ['duesseldorf_february', 'DEMO · Rheinufer Aktionstag', 'Veranstaltung', 'Mannesmannufer', '1', '40213', 'Düsseldorf', 'NW', 51.2244, 6.7702, '2027-02-02', 'Route nach Hamburg', EventType::EVENT, 40, 20],
+            ['hamburg_february', 'DEMO · HafenCity Schulcampus', 'Schule', 'Überseeallee', '10', '20457', 'Hamburg', 'HH', 53.5413, 9.9944, '2027-02-04', 'Tourraum Hamburg', EventType::SCHOOL, 54, 6],
+            ['ostsee_march', 'DEMO · Seegras-Aktionsmonat Rostock', 'Veranstaltung', 'Warnowufer', '65', '18057', 'Rostock', 'MV', 54.0887, 12.1400, '2027-03-17', 'Ostsee · Aktionsmonat Seegras', EventType::EVENT, 50, 25],
+            ['ostsee_may', 'DEMO · Ostsee Bildungswoche Lübeck', 'Schule', 'Willy-Brandt-Allee', '10', '23554', 'Lübeck', 'SH', 53.8769, 10.6867, '2027-05-13', 'Ostsee · Aktionsmonat Seegras', EventType::SCHOOL, 48, 6],
+            ['nordsee_june', 'DEMO · Nordsee Familienfest Bremerhaven', 'Veranstaltung', 'Hans-Scharoun-Platz', '1', '27568', 'Bremerhaven', 'HB', 53.5488, 8.5809, '2027-06-15', 'Tourraum Nordsee', EventType::EVENT, 65, 30],
+            ['nordsee_august', 'DEMO · Nordsee Sommertage Husum', 'Veranstaltung', 'Hafenstraße', '7', '25813', 'Husum', 'SH', 54.4754, 9.0517, '2027-08-18', 'Tourraum Nordsee', EventType::EVENT, 70, 35],
+            ['sueddeutschland_september', 'DEMO · Isar Bildungsfestival München', 'Veranstaltung', 'Ludwigstraße', '14', '80539', 'München', 'BY', 48.1500, 11.5800, '2027-09-14', 'Tourraum Süddeutschland', EventType::EVENT, 55, 25],
+        ];
+        $fixtures = [];
+        foreach ($stops as [$key, $name, $type, $street, $houseNumber, $postalCode, $city, $state, $latitude, $longitude, $date, $startLabel, $eventType, $children, $adults]) {
+            $fixtures[$key] = $this->fixture([
+                'institution_name' => $name,
+                'institution_type' => $type,
+                'contact_first_name' => 'Team',
+                'contact_last_name' => 'Demo',
+                'contact_email' => 'demo+' . $key . '@proocean.example',
+                'contact_phone' => '07071 555 0999',
+                'street' => $street,
+                'house_number' => $houseNumber,
+                'postal_code' => $postalCode,
+                'city' => $city,
+                'state_code' => $state,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'distance_km' => 24.0,
+                'cost' => 20.40,
+                'request_mode' => 'specific_date',
+                'specific_requested_date' => $date,
+                'classes' => [['class_name' => 'Demo-Gruppe', 'grade' => 4, 'participant_count' => $children + $adults]],
+                'children_count' => $children,
+                'adult_count' => $adults,
+                'main_status' => RequestStatus::CONFIRMED,
+                'work_state' => WorkState::ACCEPTED,
+                'internal_note' => 'Zukünftiger Demo-Tourstopp für die Jahresplanung.',
+                'appointment' => [
+                    'date' => $date,
+                    'public_city' => $city,
+                    'route' => ['start_label' => $startLabel, 'start_latitude' => $latitude, 'start_longitude' => $longitude, 'distance_km' => 24.0, 'cost' => 20.40],
+                    'event_type' => $eventType,
+                    'participants_children' => $children,
+                    'participants_adults' => $adults,
+                ],
+            ]);
+        }
+        return $fixtures;
+    }
+
+    private function seedTourCalendar(): void
+    {
+        $calendar = new CalendarDayRepository();
+        $periods = [
+            ['2026-10-12', '2026-10-16', 'Tourraum Stuttgart', 'Oktober: Großraum Stuttgart, HABA und Schillerhöhe.'],
+            ['2026-11-09', '2026-11-13', 'Tourraum Stuttgart', 'November: Großraum Stuttgart.'],
+            ['2026-12-01', '2026-12-31', 'Geblockt', 'Dezember: Tour de Deutschland / Besuch bei No Köln in Prüfung.'],
+            ['2027-01-11', '2027-01-15', 'Route nach Norden', 'Frankfurt und Köln auf dem Weg nach Norden.'],
+            ['2027-02-01', '2027-02-05', 'Tourraum Hamburg', 'Düsseldorf und Hamburg.'],
+            ['2027-03-15', '2027-03-19', 'Ostsee · Aktionsmonat Seegras', 'Start der Ostsee-Tour.'],
+            ['2027-05-10', '2027-05-14', 'Ostsee · Aktionsmonat Seegras', 'Ostsee-Tour im Aktionsmonat Seegras.'],
+            ['2027-06-14', '2027-06-18', 'Tourraum Nordsee', 'Nordsee-Sommertour.'],
+            ['2027-08-16', '2027-08-20', 'Tourraum Nordsee', 'Nordsee-Sommertour.'],
+            ['2027-09-13', '2027-09-17', 'Tourraum Süddeutschland', 'September: Süddeutschland.'],
+        ];
+        foreach ($periods as [$from, $to, $note, $internal]) {
+            $state = $from === '2026-12-01' ? CalendarState::UNAVAILABLE : CalendarState::LIMITED;
+            $calendar->upsertRange($from, $to, $state, $note, $this->marker('calendar') . ' ' . $internal);
+        }
     }
 
     private function manifest(): array
@@ -436,7 +512,7 @@ final class DemoDataService
                     'participants_adults' => 4,
                 ],
             ]),
-        ];
+        ] + $this->futureTourFixtures();
     }
 
     private function fixture(array $data): array

@@ -188,7 +188,7 @@ final class RequestRepository
             'new' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'new'"),
             'in_review' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'in_review'"),
             'awaiting_response' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'awaiting_response'"),
-            'warnings' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE parking_available != 'yes' OR electricity_charging_available != 'yes' OR water_available != 'yes' OR (venue_type IN ('outdoor','both') AND (electricity_outdoor_available != 'yes' OR bad_weather_option_available != 'yes'))"),
+            'warnings' => 0,
             'routing_errors' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state NOT IN ('accepted','rejected','cancelled') AND (latitude IS NULL OR longitude IS NULL OR route_distance_km IS NULL)"),
         ];
     }

@@ -247,36 +247,32 @@ final class RequestController
         if ($participants !== ($children + $adults)) {
             return 'Die Personenzahl stimmt nicht mit der Gruppe überein.';
         }
-        foreach (['parking_available', 'indoor_room_available', 'electricity_charging_available', 'water_available', 'changing_room_available', 'shower_available', 'natural_water_nearby', 'wifi_available'] as $field) {
+        foreach (['electricity_charging_available', 'water_available', 'changing_room_available', 'shower_available', 'natural_water_nearby', 'wifi_available'] as $field) {
             if (isset($payload[$field]) && ! is_scalar($payload[$field])) {
                 return 'Bitte beantworte alle Vor-Ort-Fragen.';
             }
-            if (! in_array((string) ($payload[$field] ?? ''), ['yes', 'no'], true)) {
-                return 'Bitte beantworte alle Vor-Ort-Fragen.';
+            if (($payload[$field] ?? '') !== '' && ! in_array((string) $payload[$field], ['yes', 'no'], true)) {
+                return 'Bitte prüfe die Vor-Ort-Angaben.';
             }
         }
         $venueType = (string) ($payload['venue_type'] ?? '');
         if (! in_array($venueType, ['indoor', 'outdoor', 'both'], true)) {
             return 'Bitte wähle den vorgesehenen Einsatzbereich.';
         }
-        if (in_array($venueType, ['indoor', 'both'], true) && trim((string) ($payload['indoor_room_description'] ?? '')) === '') {
-            return 'Bitte beschreibe die Räumlichkeit für den Inneneinsatz.';
-        }
-        if (in_array($venueType, ['outdoor', 'both'], true) && trim((string) ($payload['outdoor_area_description'] ?? '')) === '') {
-            return 'Bitte beschreibe die Fläche für den Außeneinsatz.';
-        }
         if (in_array($venueType, ['outdoor', 'both'], true)) {
             foreach (['bad_weather_option_available', 'electricity_outdoor_available'] as $field) {
-                if (! in_array((string) ($payload[$field] ?? ''), ['yes', 'no'], true)) {
-                    return 'Bitte beantworte die Fragen zum Außenbereich.';
+                if (($payload[$field] ?? '') !== '' && ! in_array((string) $payload[$field], ['yes', 'no'], true)) {
+                    return 'Bitte prüfe die Angaben zum Außenbereich.';
                 }
             }
         }
-        if ((string) ($payload['parking_available'] ?? '') === 'yes') {
-            if (! in_array((string) ($payload['parking_type'] ?? ''), ['schoolyard', 'parking_lot', 'street', 'other'], true)
-                || ! $this->isGoogleMapsUrl((string) ($payload['parking_location'] ?? ''))) {
-                return 'Bitte ergänze die Stellplatzart und einen gültigen Google-Maps-Link.';
-            }
+        $parkingType = (string) ($payload['parking_type'] ?? '');
+        if ($parkingType !== '' && ! in_array($parkingType, ['schoolyard', 'parking_lot', 'street', 'other'], true)) {
+            return 'Bitte prüfe die Art des Stellplatzes.';
+        }
+        $parkingLocation = trim((string) ($payload['parking_location'] ?? ''));
+        if ($parkingLocation !== '' && ! $this->isGoogleMapsUrl($parkingLocation)) {
+            return 'Bitte prüfe den Google-Maps-Link zum Stellplatz.';
         }
         foreach ([
             'presentation_equipment' => ['chalkboard', 'projector', 'digital_display', 'other'],

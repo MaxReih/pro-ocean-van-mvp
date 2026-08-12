@@ -262,8 +262,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                             <option value="full_day">Ganztägig</option>
                         </select>
                     </label>
-                    <label data-event-section="Schule" hidden>Relevante Klassenstunden und Pausen
-                        <textarea name="school_schedule_notes" data-type-required placeholder="z. B. 2.–4. Stunde, große Pause 10:15–10:45 Uhr"></textarea>
+                    <label data-event-section="Schule" hidden>Hinweise / Wünsche zur zeitlichen Planung
+                        <textarea name="school_schedule_notes" placeholder="z. B. Unterrichtszeiten, Pausen oder besondere Zeitfenster"></textarea>
                     </label>
                 </div>
                 <p class="pov-planning-note">Für Aufbau und Vorbereitung benötigen wir mindestens 1 Stunde vor Veranstaltungsbeginn Zugang zur Räumlichkeit bzw. Fläche.</p>
@@ -281,16 +281,16 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </label>
                 <div class="pov-grid-2 pov-venue-details">
                     <label data-venue-section="indoor" hidden>Beschreibung Räumlichkeit Innenraum-Veranstaltung
-                        <textarea name="indoor_room_description" data-venue-required placeholder="Größe, Zugang, Etage und Besonderheiten"></textarea>
+                        <textarea name="indoor_room_description" placeholder="Größe, Zugang, Etage und Besonderheiten"></textarea>
                     </label>
                     <label data-venue-section="outdoor" hidden>Beschreibung Räumlichkeit Außen-Veranstaltung
-                        <textarea name="outdoor_area_description" data-venue-required placeholder="Untergrund, Größe, Zufahrt und Besonderheiten"></textarea>
+                        <textarea name="outdoor_area_description" placeholder="Untergrund, Größe, Zufahrt und Besonderheiten"></textarea>
                     </label>
                 </div>
                 <fieldset class="pov-choice-fieldset pov-question pov-fallback-question" data-venue-section="outdoor" hidden>
                     <legend>Schlechtwetteroption vorhanden?</legend>
                     <div>
-                        <label><input type="radio" name="bad_weather_option_available" value="yes" data-venue-required><span>Ja</span></label>
+                        <label><input type="radio" name="bad_weather_option_available" value="yes"><span>Ja</span></label>
                         <label><input type="radio" name="bad_weather_option_available" value="no"><span>Nein</span></label>
                     </div>
                 </fieldset>
@@ -299,7 +299,6 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
             <div class="pov-questions">
                 <?php
                 $questions = [
-                    'parking_available' => 'Parkplatz für den Van',
                     'water_available' => 'Wasser oder Waschbecken',
                     'changing_room_available' => 'Umkleidekabine',
                     'shower_available' => 'Duschmöglichkeit',
@@ -311,7 +310,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     <fieldset class="pov-choice-fieldset pov-question">
                         <legend><?php echo esc_html($label); ?></legend>
                         <div>
-                            <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="yes" required><span>Ja</span></label>
+                            <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="yes"><span>Ja</span></label>
                             <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="no"><span>Nein</span></label>
                         </div>
                     </fieldset>
@@ -319,7 +318,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <fieldset class="pov-choice-fieldset pov-question" data-venue-section="outdoor" hidden>
                     <legend>Stromanschluss in der Nähe des Außenbereichs</legend>
                     <div>
-                        <label><input type="radio" name="electricity_outdoor_available" value="yes" data-venue-required><span>Ja</span></label>
+                        <label><input type="radio" name="electricity_outdoor_available" value="yes"><span>Ja</span></label>
                         <label><input type="radio" name="electricity_outdoor_available" value="no"><span>Nein</span></label>
                     </div>
                     <small>Maximale Entfernung entsprechend der verfügbaren Kabeltrommel.</small>
@@ -329,7 +328,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         <span class="pov-info-tip" tabindex="0" aria-label="Hinweis zum Stromanschluss">i<span role="tooltip">Für Laptop, VR-Technik, Wechselakkus und weitere Geräte.</span></span>
                     </legend>
                     <div>
-                        <label><input type="radio" name="electricity_charging_available" value="yes" required><span>Ja</span></label>
+                        <label><input type="radio" name="electricity_charging_available" value="yes"><span>Ja</span></label>
                         <label><input type="radio" name="electricity_charging_available" value="no"><span>Nein</span></label>
                     </div>
                 </fieldset>
@@ -339,10 +338,10 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <h2>Van-Stellplatz
                     <span class="pov-info-tip" tabindex="0" aria-label="Maße und Gewicht des Ocean Vans">i<span role="tooltip">Länge: 6 m, Breite: 2,05 m, Höhe: 2,522 m; je nach Beladung 2,5–3,5 Tonnen.</span></span>
                 </h2>
-                <div class="pov-grid-2" data-parking-details hidden>
+                <div class="pov-grid-2">
                     <label>Art des Stellplatzes
-                        <select name="parking_type" data-parking-required>
-                            <option value="">Bitte auswählen</option>
+                        <select name="parking_type">
+                            <option value="">Optional auswählen</option>
                             <option value="schoolyard">Schulhof</option>
                             <option value="parking_lot">Parkplatz</option>
                             <option value="street">Straßenrand / Ladezone</option>
@@ -350,7 +349,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         </select>
                     </label>
                     <label>Google-Maps-Link zum Stellplatz
-                        <input type="url" name="parking_location" data-parking-required placeholder="https://maps.google.com/…">
+                        <input type="url" name="parking_location" placeholder="https://maps.google.com/…">
                     </label>
                 </div>
             </section>
