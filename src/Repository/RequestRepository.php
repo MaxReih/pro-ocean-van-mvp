@@ -64,14 +64,24 @@ final class RequestRepository
             'longitude' => $this->coordinateOrNull($payload['_server_longitude'] ?? null, -180, 180),
             'parking_available' => $this->availabilityAnswer($payload['parking_available'] ?? ''),
             'parking_type' => $this->allowedValue($payload['parking_type'] ?? '', ['schoolyard', 'parking_lot', 'street', 'other']),
-            'parking_location' => sanitize_text_field((string) ($payload['parking_location'] ?? '')),
+            'parking_location' => esc_url_raw((string) ($payload['parking_location'] ?? '')),
             'indoor_room_available' => $this->availabilityAnswer($payload['indoor_room_available'] ?? ''),
             'venue_type' => $this->allowedValue($payload['venue_type'] ?? '', ['indoor', 'outdoor', 'both']),
             'indoor_room_description' => sanitize_textarea_field((string) ($payload['indoor_room_description'] ?? '')),
             'outdoor_area_description' => sanitize_textarea_field((string) ($payload['outdoor_area_description'] ?? '')),
             'bad_weather_option_available' => $this->availabilityAnswer($payload['bad_weather_option_available'] ?? ''),
             'electricity_available' => $this->availabilityAnswer($payload['electricity_available'] ?? ''),
+            'electricity_outdoor_available' => $this->availabilityAnswer($payload['electricity_outdoor_available'] ?? ''),
+            'electricity_charging_available' => $this->availabilityAnswer($payload['electricity_charging_available'] ?? ''),
             'water_available' => $this->availabilityAnswer($payload['water_available'] ?? ''),
+            'changing_room_available' => $this->availabilityAnswer($payload['changing_room_available'] ?? ''),
+            'shower_available' => $this->availabilityAnswer($payload['shower_available'] ?? ''),
+            'natural_water_nearby' => $this->availabilityAnswer($payload['natural_water_nearby'] ?? ''),
+            'presentation_equipment' => $this->allowedValuesCsv($payload['presentation_equipment'] ?? [], ['chalkboard', 'projector', 'digital_display', 'other']),
+            'presentation_equipment_other' => sanitize_text_field((string) ($payload['presentation_equipment_other'] ?? '')),
+            'laptop_connections' => $this->allowedValuesCsv($payload['laptop_connections'] ?? [], ['usb_c', 'usb_a', 'other']),
+            'laptop_connection_other' => sanitize_text_field((string) ($payload['laptop_connection_other'] ?? '')),
+            'wifi_available' => $this->availabilityAnswer($payload['wifi_available'] ?? ''),
             'accessibility_notes' => sanitize_textarea_field((string) ($payload['accessibility_notes'] ?? '')),
             'group_notes' => sanitize_textarea_field((string) ($payload['group_notes'] ?? '')),
             'general_notes' => sanitize_textarea_field((string) ($payload['general_notes'] ?? '')),
@@ -178,7 +188,7 @@ final class RequestRepository
             'new' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'new'"),
             'in_review' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'in_review'"),
             'awaiting_response' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state = 'awaiting_response'"),
-            'warnings' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE parking_available != 'yes' OR electricity_available != 'yes' OR water_available != 'yes' OR (venue_type IN ('outdoor','both') AND bad_weather_option_available != 'yes')"),
+            'warnings' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE parking_available != 'yes' OR electricity_charging_available != 'yes' OR water_available != 'yes' OR (venue_type IN ('outdoor','both') AND (electricity_outdoor_available != 'yes' OR bad_weather_option_available != 'yes'))"),
             'routing_errors' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE work_state NOT IN ('accepted','rejected','cancelled') AND (latitude IS NULL OR longitude IS NULL OR route_distance_km IS NULL)"),
         ];
     }
@@ -288,14 +298,24 @@ final class RequestRepository
             'general_notes' => sanitize_textarea_field((string) ($data['general_notes'] ?? '')),
             'parking_available' => $this->availabilityAnswer($data['parking_available'] ?? ''),
             'parking_type' => $this->allowedValue($data['parking_type'] ?? '', ['schoolyard', 'parking_lot', 'street', 'other']),
-            'parking_location' => sanitize_text_field((string) ($data['parking_location'] ?? '')),
+            'parking_location' => esc_url_raw((string) ($data['parking_location'] ?? '')),
             'indoor_room_available' => $this->availabilityAnswer($data['indoor_room_available'] ?? ''),
             'venue_type' => $this->allowedValue($data['venue_type'] ?? '', ['indoor', 'outdoor', 'both']),
             'indoor_room_description' => sanitize_textarea_field((string) ($data['indoor_room_description'] ?? '')),
             'outdoor_area_description' => sanitize_textarea_field((string) ($data['outdoor_area_description'] ?? '')),
             'bad_weather_option_available' => $this->availabilityAnswer($data['bad_weather_option_available'] ?? ''),
             'electricity_available' => $this->availabilityAnswer($data['electricity_available'] ?? ''),
+            'electricity_outdoor_available' => $this->availabilityAnswer($data['electricity_outdoor_available'] ?? ''),
+            'electricity_charging_available' => $this->availabilityAnswer($data['electricity_charging_available'] ?? ''),
             'water_available' => $this->availabilityAnswer($data['water_available'] ?? ''),
+            'changing_room_available' => $this->availabilityAnswer($data['changing_room_available'] ?? ''),
+            'shower_available' => $this->availabilityAnswer($data['shower_available'] ?? ''),
+            'natural_water_nearby' => $this->availabilityAnswer($data['natural_water_nearby'] ?? ''),
+            'presentation_equipment' => $this->allowedValuesCsv($data['presentation_equipment'] ?? [], ['chalkboard', 'projector', 'digital_display', 'other']),
+            'presentation_equipment_other' => sanitize_text_field((string) ($data['presentation_equipment_other'] ?? '')),
+            'laptop_connections' => $this->allowedValuesCsv($data['laptop_connections'] ?? [], ['usb_c', 'usb_a', 'other']),
+            'laptop_connection_other' => sanitize_text_field((string) ($data['laptop_connection_other'] ?? '')),
+            'wifi_available' => $this->availabilityAnswer($data['wifi_available'] ?? ''),
             'updated_at' => current_time('mysql'),
         ], ['id' => $id]);
         if ($updated === false) {
@@ -362,6 +382,8 @@ final class RequestRepository
             'indoor_room_description' => '',
             'outdoor_area_description' => '',
             'parking_location' => '',
+            'presentation_equipment_other' => '',
+            'laptop_connection_other' => '',
             'privacy_consent' => 0,
             'updated_at' => current_time('mysql'),
             'closed_at' => current_time('mysql'),
@@ -430,6 +452,13 @@ final class RequestRepository
     {
         $value = sanitize_key((string) $value);
         return in_array($value, $allowed, true) ? $value : '';
+    }
+
+    private function allowedValuesCsv(mixed $values, array $allowed): string
+    {
+        $values = is_array($values) ? $values : explode(',', (string) $values);
+        $values = array_map(static fn (mixed $value): string => sanitize_key((string) $value), $values);
+        return implode(',', array_values(array_unique(array_intersect($values, $allowed))));
     }
 
     private function positiveIntOrNull(mixed $value): ?int

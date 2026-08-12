@@ -994,8 +994,90 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
   margin-bottom: 22px;
 }
 
-.pov-parking-block .pov-fieldset-intro {
-  margin-bottom: 16px;
+.pov-info-tip {
+  position: relative;
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  margin-left: 5px;
+  color: var(--pov-white);
+  background: var(--pov-blue);
+  border-radius: 50%;
+  cursor: help;
+  font-family: Quicksand, "Segoe UI", Arial, sans-serif;
+  font-size: .72rem;
+  font-weight: 900;
+  vertical-align: 2px;
+}
+
+.pov-info-tip [role="tooltip"] {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  left: 50%;
+  width: min(280px, 74vw);
+  padding: 10px 12px;
+  color: var(--pov-white);
+  background: var(--pov-ink);
+  border-radius: 9px;
+  box-shadow: 0 10px 28px rgba(7, 63, 91, .2);
+  font-size: .75rem;
+  font-weight: 650;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.pov-info-tip:hover [role="tooltip"],
+.pov-info-tip:focus [role="tooltip"],
+.pov-info-tip:focus-within [role="tooltip"] {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.pov-fallback-question {
+  margin-top: 16px !important;
+}
+
+.pov-checklist-fieldset {
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.pov-checklist-fieldset > legend {
+  margin-bottom: 10px;
+  font-size: .86rem;
+  font-weight: 800;
+}
+
+.pov-checklist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pov-checklist label {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  min-height: 46px;
+  padding: 9px 11px;
+  background: var(--pov-white);
+  border: 1px solid var(--pov-mist);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.pov-checklist input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
 }
 
 .pov-selected-slot {
@@ -1418,6 +1500,10 @@ body:has(.pov-booking) #wp--skip-link--target > .wp-block-group { padding-top: 0
 
   .pov-question > div {
     width: 100%;
+  }
+
+  .pov-checklist {
+    grid-template-columns: 1fr;
   }
 
   .pov-actions {

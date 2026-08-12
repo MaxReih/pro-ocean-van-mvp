@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Pro Ocean Van Planner
  * Description: Buchungs-, Kalender- und Routing-MVP für den Pro Ocean Ocean Van.
- * Version: 0.8.0
+ * Version: 0.8.1
  * Author: Pro Ocean
  * Requires PHP: 8.1
  * Requires at least: 6.5
@@ -15,7 +15,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('POV_VERSION', '0.8.0');
+define('POV_VERSION', '0.8.1');
 define('POV_PLUGIN_FILE', __FILE__);
 define('POV_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POV_PLUGIN_URL', plugin_dir_url(__FILE__));

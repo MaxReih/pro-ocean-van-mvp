@@ -332,6 +332,8 @@
 .pov-route-cluster > header { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 15px; }
 .pov-route-cluster > header h2 { margin: 4px 0 5px; font-size: 20px; }
 .pov-route-cluster > header p { margin: 0; font-size: 11px; }
+.pov-route-cluster-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.pov-route-cluster-actions .button { white-space: nowrap; }
 .pov-route-badge { padding: 6px 9px; color: var(--pov-green); background: var(--pov-mint); border-radius: 999px; font-size: 9px; font-weight: 850; white-space: nowrap; }
 .pov-route-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .pov-route-metrics > div { display: grid; gap: 2px; padding: 12px; background: #f7f9f9; border-radius: 9px; }
@@ -531,4 +533,6 @@
   .pov-stat-costs { grid-template-columns: 1fr; }
   .pov-tour-stop { grid-template-columns: 48px minmax(0, 1fr); }
   .pov-tour-stop-actions { grid-column: 2; justify-content: flex-start; }
+  .pov-route-cluster > header { display: grid; }
+  .pov-route-cluster-actions { justify-content: flex-start; }
 }

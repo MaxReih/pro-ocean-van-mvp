@@ -629,12 +629,28 @@
       const visible = venue === 'both' || venue === sectionType;
       toggleConditionalSection(section, visible, 'data-venue-required');
     });
+    updateOtherFields();
   }
 
   function updateParkingDetails() {
     const details = $('[data-parking-details]', form);
     const visible = radioValue('parking_available') === 'yes';
     toggleConditionalSection(details, visible, 'data-parking-required');
+  }
+
+  function updateOtherField(name) {
+    const toggle = $('[data-toggle-other="' + name + '"]', form);
+    const wrapper = $('[data-other-field="' + name + '"]', form);
+    if (!toggle || !wrapper) return;
+    const visible = toggle.checked && !toggle.disabled;
+    wrapper.hidden = !visible;
+    const field = $('input, textarea', wrapper);
+    if (field) field.disabled = !visible;
+  }
+
+  function updateOtherFields() {
+    updateOtherField('presentation');
+    updateOtherField('laptop');
   }
 
   function clearStepErrors(fieldset) {
@@ -708,7 +724,7 @@
       availabilityLabels[form.elements.availability_window.value] || 'Zeit noch offen',
       venueLabels[venue] || 'Einsatzbereich noch offen',
       'Parkplatz: ' + answerLabel(radioValue('parking_available')),
-      'Strom: ' + answerLabel(radioValue('electricity_available')),
+      'Ladestrom: ' + answerLabel(radioValue('electricity_charging_available')),
       'Wasser: ' + answerLabel(radioValue('water_available'))
     ].join(' · ');
     $('[data-role="summary-content"]').innerHTML =
@@ -845,8 +861,18 @@
       parking_available: data.get('parking_available') || '',
       parking_type: radioValue('parking_available') === 'yes' ? data.get('parking_type') || '' : '',
       parking_location: radioValue('parking_available') === 'yes' ? data.get('parking_location') || '' : '',
-      electricity_available: data.get('electricity_available') || '',
+      electricity_available: data.get('electricity_charging_available') || '',
+      electricity_outdoor_available: outdoor ? radioValue('electricity_outdoor_available') : '',
+      electricity_charging_available: data.get('electricity_charging_available') || '',
       water_available: data.get('water_available') || '',
+      changing_room_available: data.get('changing_room_available') || '',
+      shower_available: data.get('shower_available') || '',
+      natural_water_nearby: data.get('natural_water_nearby') || '',
+      presentation_equipment: data.getAll('presentation_equipment[]'),
+      presentation_equipment_other: data.getAll('presentation_equipment[]').includes('other') ? data.get('presentation_equipment_other') || '' : '',
+      laptop_connections: data.getAll('laptop_connections[]'),
+      laptop_connection_other: data.getAll('laptop_connections[]').includes('other') ? data.get('laptop_connection_other') || '' : '',
+      wifi_available: data.get('wifi_available') || '',
       venue_type: venue,
       indoor_room_available: venue === 'indoor' || venue === 'both' ? 'yes' : 'no',
       indoor_room_description: venue === 'indoor' || venue === 'both' ? data.get('indoor_room_description') || '' : '',
@@ -975,6 +1001,9 @@
   $$('input[name="parking_available"]', form).forEach(function (field) {
     field.addEventListener('change', updateParkingDetails);
   });
+  $$('[data-toggle-other]', form).forEach(function (field) {
+    field.addEventListener('change', updateOtherFields);
+  });
   ['street', 'house_number', 'city'].forEach(function (name) {
     form.elements[name].addEventListener('change', trackAddressChange);
   });
@@ -1004,5 +1033,6 @@
   updateEventTypeSections();
   updateVenueSections();
   updateParkingDetails();
+  updateOtherFields();
   loadCalendar();
 })();

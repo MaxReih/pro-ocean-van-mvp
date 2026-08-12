@@ -259,7 +259,7 @@ Invoke-BrowserExpression -Expression @'
     parking.checked = true;
     parking.dispatchEvent(new Event('change', { bubbles: true }));
     form.elements.parking_type.value = 'schoolyard';
-    form.elements.parking_location.value = 'Musterstra\u00dfe 12, 72072 T\u00fcbingen';
+    form.elements.parking_location.value = 'https://www.google.com/maps/place/Musterstrasse+12';
     document.querySelector('.pov-parking-block').scrollIntoView({ block: 'center' });
     return true;
 })()

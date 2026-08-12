@@ -376,7 +376,8 @@ final class Menu
                 $stopSummary .= ' · ' . (int) $cluster['confirmed_count'] . ' bestätigt';
             }
             $source = ['heigit' => 'HeiGIT-Straßenmatrix', 'osrm' => 'Straßenmatrix', 'estimated' => 'Geschätzte Fahrzeit'][(string) $cluster['matrix_source']] ?? 'Routendaten';
-            echo '<article class="pov-route-cluster' . ($cluster['priority'] === 'recommended' ? ' is-recommended' : '') . '"><header><div><span class="pov-admin-eyebrow">' . esc_html(GermanDateFormatter::short((string) $cluster['week_start']) . ' – ' . GermanDateFormatter::short((string) $cluster['week_end'])) . '</span><h2>' . esc_html((string) $cluster['title']) . '</h2><p>' . esc_html($stopSummary . ' · Start ' . (string) $cluster['start_label']) . '</p></div><span class="pov-route-badge">' . ($cluster['priority'] === 'recommended' ? 'Empfohlen' : 'Entwurf') . '</span></header>';
+            $tourMapsUrl = $this->tourMapsUrl($cluster, $stops);
+            echo '<article class="pov-route-cluster' . ($cluster['priority'] === 'recommended' ? ' is-recommended' : '') . '"><header><div><span class="pov-admin-eyebrow">' . esc_html(GermanDateFormatter::short((string) $cluster['week_start']) . ' – ' . GermanDateFormatter::short((string) $cluster['week_end'])) . '</span><h2>' . esc_html((string) $cluster['title']) . '</h2><p>' . esc_html($stopSummary . ' · Start ' . (string) $cluster['start_label']) . '</p></div><div class="pov-route-cluster-actions"><a class="button" href="' . esc_url($tourMapsUrl) . '" target="_blank" rel="noopener">Gesamte Tour in Google Maps</a><span class="pov-route-badge">' . ($cluster['priority'] === 'recommended' ? 'Empfohlen' : 'Entwurf') . '</span></div></header>';
             echo '<div class="pov-route-metrics"><div><span>Tourstrecke</span><strong>' . esc_html(number_format((float) $cluster['route_distance_km'], 0, ',', '.') . ' km') . '</strong><small>' . esc_html($source) . '</small></div><div><span>Fahrzeit</span><strong>' . esc_html($this->durationLabel((float) $cluster['route_duration_minutes'])) . '</strong><small>inklusive Rückfahrt</small></div><div><span>Fahrtkosten</span><strong>' . esc_html(number_format((float) $cluster['estimated_cost'], 2, ',', '.') . ' €') . '</strong></div><div><span>Übernachtung</span><strong>' . esc_html(number_format($overnightCost, 2, ',', '.') . ' €') . '</strong><small>Tour gesamt ' . esc_html(number_format((float) $cluster['estimated_cost'] + $overnightCost, 2, ',', '.') . ' €') . '</small></div></div>';
             echo '<div class="pov-tour-timeline"><div class="pov-tour-depot"><span>S</span><div><small>Start</small><strong>' . esc_html((string) $cluster['start_label']) . '</strong></div></div>';
             foreach ($stops as $index => $stop) {
@@ -386,14 +387,11 @@ final class Menu
                 $date = (string) ($stop['_planning_date'] ?? $stop['appointment_date'] ?? '');
                 $requestId = $confirmed ? (int) ($stop['request_id'] ?? 0) : (int) ($stop['id'] ?? 0);
                 $dateType = $confirmed ? 'Bestätigt' : (! empty($stop['_optimized_date']) ? 'Routenempfehlung' : 'Anfrage');
-                $mapQuery = trim((string) ($stop['street'] ?? '') . ' ' . (string) ($stop['house_number'] ?? '') . ', ' . (string) ($stop['postal_code'] ?? '') . ' ' . (string) ($stop['city'] ?? ''));
-                $mapsUrl = add_query_arg(['api' => '1', 'query' => $mapQuery], 'https://www.google.com/maps/search/');
                 echo '<div class="pov-tour-stop' . ($confirmed ? ' is-confirmed' : '') . '"><time datetime="' . esc_attr($date) . '"><strong>' . esc_html(GermanDateFormatter::weekdayShort($date)) . '</strong><span>' . esc_html(mysql2date('d.m.', $date)) . '</span></time><div><small>' . esc_html($dateType) . '</small><strong>' . esc_html((string) $stop['institution_name']) . '</strong><span>' . esc_html((string) $stop['postal_code'] . ' ' . (string) $stop['city']) . '</span></div>';
-                echo '<div class="pov-tour-stop-actions"><a class="button" href="' . esc_url($mapsUrl) . '" target="_blank" rel="noopener">Google Maps</a>';
                 if ($requestId > 0 && current_user_can(Capabilities::VIEW_REQUESTS)) {
-                    echo '<a class="button" href="' . esc_url($this->pageUrl('pov-requests', ['request_id' => $requestId])) . '">Öffnen</a>';
+                    echo '<div class="pov-tour-stop-actions"><a class="button" href="' . esc_url($this->pageUrl('pov-requests', ['request_id' => $requestId])) . '">Öffnen</a></div>';
                 }
-                echo '</div></div>';
+                echo '</div>';
                 foreach ((array) ($overnights[$index] ?? []) as $overnight) {
                     echo '<div class="pov-tour-overnight"><span aria-hidden="true">Zzz</span><div><small>Übernachtungsregion</small><strong>' . esc_html((string) $overnight['place']) . '</strong><em>' . esc_html((string) $overnight['reason']) . '</em></div>';
                     if (current_user_can(Capabilities::MANAGE_TOURS)) {
@@ -415,6 +413,26 @@ final class Menu
         }
         $this->routeIssues($issues);
         $this->footer();
+    }
+
+    private function tourMapsUrl(array $cluster, array $stops): string
+    {
+        $waypoints = [];
+        foreach ($stops as $stop) {
+            $address = trim((string) ($stop['street'] ?? '') . ' ' . (string) ($stop['house_number'] ?? ''));
+            $place = trim((string) ($stop['postal_code'] ?? '') . ' ' . (string) ($stop['city'] ?? ''));
+            $waypoints[] = trim($address . ($address !== '' && $place !== '' ? ', ' : '') . $place);
+        }
+        $waypoints = array_values(array_filter($waypoints));
+        $start = trim((string) ($cluster['start_label'] ?? ''));
+
+        return add_query_arg([
+            'api' => '1',
+            'origin' => $start,
+            'destination' => $start,
+            'waypoints' => implode('|', $waypoints),
+            'travelmode' => 'driving',
+        ], 'https://www.google.com/maps/dir/');
     }
 
     private function tourExpensesPanel(array $expenses): string
@@ -1314,7 +1332,12 @@ final class Menu
     private function warningCount(array $request): int
     {
         $count = 0;
-        foreach (['parking_available', 'indoor_room_available', 'bad_weather_option_available', 'electricity_available', 'water_available'] as $field) {
+        $fields = ['parking_available', 'electricity_charging_available', 'water_available'];
+        if (in_array((string) ($request['venue_type'] ?? ''), ['outdoor', 'both'], true)) {
+            $fields[] = 'bad_weather_option_available';
+            $fields[] = 'electricity_outdoor_available';
+        }
+        foreach ($fields as $field) {
             if (($request[$field] ?? 'unknown') !== 'yes') {
                 $count++;
             }
@@ -1574,12 +1597,14 @@ final class Menu
         $children = max(0, (int) ($request['children_count'] ?? 0));
         $adults = max(0, (int) ($request['adult_count'] ?? 0));
         $weekdays = array_fill_keys(array_filter(explode(',', (string) ($request['possible_weekdays'] ?? ''))), true);
-        $answers = ['yes' => 'Ja', 'no' => 'Nein', 'unknown' => 'Unklar'];
+        $answers = ['' => 'Bitte wählen', 'yes' => 'Ja', 'no' => 'Nein'];
         $schoolGrades = ['' => 'Nicht erfasst', 'preschool' => 'Vorschule'];
         for ($grade = 1; $grade <= 13; $grade++) {
             $schoolGrades['grade_' . $grade] = $grade . '. Klasse';
         }
         $schoolGrades += ['vocational' => 'Berufsschule', 'mixed' => 'Altersgemischt'];
+        $presentationEquipment = array_fill_keys(array_filter(explode(',', (string) ($request['presentation_equipment'] ?? ''))), true);
+        $laptopConnections = array_fill_keys(array_filter(explode(',', (string) ($request['laptop_connections'] ?? ''))), true);
         ob_start();
         echo '<details class="pov-admin-panel pov-request-editor"><summary>Anfrage und Termin ändern</summary><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
         wp_nonce_field('pov_save_request_details');
@@ -1610,10 +1635,21 @@ final class Menu
         echo '<label>Altersrange Kinder <input name="event_child_age_range" value="' . esc_attr((string) ($request['event_child_age_range'] ?? '')) . '"></label><label>Veranstaltungsart / Anlass <textarea name="occasion_description">' . esc_textarea((string) ($request['occasion_description'] ?? '')) . '</textarea></label>';
         echo '<label>Hinweise <textarea name="general_notes">' . esc_textarea((string) ($request['general_notes'] ?? '')) . '</textarea></label>';
         echo '<fieldset><legend>Vor Ort</legend><div class="pov-admin-two">';
-        foreach (['parking_available' => 'Parkplatz', 'indoor_room_available' => 'Innenraum', 'bad_weather_option_available' => 'Schlechtwetter', 'electricity_available' => 'Strom', 'water_available' => 'Wasser'] as $field => $label) {
-            echo '<label>' . esc_html($label) . '<select name="' . esc_attr($field) . '">' . $this->options($answers, (string) ($request[$field] ?? 'unknown')) . '</select></label>';
+        foreach (['parking_available' => 'Parkplatz', 'bad_weather_option_available' => 'Schlechtwetter', 'electricity_outdoor_available' => 'Strom Außenbereich', 'electricity_charging_available' => 'Strom Technik', 'water_available' => 'Wasser', 'changing_room_available' => 'Umkleide', 'shower_available' => 'Dusche', 'natural_water_nearby' => 'Fluss / See', 'wifi_available' => 'WLAN'] as $field => $label) {
+            $answer = in_array((string) ($request[$field] ?? ''), ['yes', 'no'], true) ? (string) $request[$field] : '';
+            echo '<label>' . esc_html($label) . '<select name="' . esc_attr($field) . '">' . $this->options($answers, $answer) . '</select></label>';
         }
-        echo '</div><label>Zeitslot <select name="availability_window">' . $this->options(['' => 'Nicht erfasst', 'morning' => 'Vormittag', 'afternoon' => 'Nachmittag', 'full_day' => 'Ganztägig'], (string) ($request['availability_window'] ?? '')) . '</select></label><label>Einsatzbereich <select name="venue_type">' . $this->options(['' => 'Nicht erfasst', 'indoor' => 'Innenraum', 'outdoor' => 'Außenbereich', 'both' => 'Innen- und Außenbereich'], (string) ($request['venue_type'] ?? '')) . '</select></label><label>Innenraum <textarea name="indoor_room_description">' . esc_textarea((string) ($request['indoor_room_description'] ?? '')) . '</textarea></label><label>Außenfläche <textarea name="outdoor_area_description">' . esc_textarea((string) ($request['outdoor_area_description'] ?? '')) . '</textarea></label><label>Stellplatzart <select name="parking_type">' . $this->options(['' => 'Nicht erfasst', 'schoolyard' => 'Schulhof', 'parking_lot' => 'Parkplatz', 'street' => 'Straßenrand / Ladezone', 'other' => 'Sonstiger Stellplatz'], (string) ($request['parking_type'] ?? '')) . '</select></label><label>Stellplatzadresse / Maps-Link <input name="parking_location" value="' . esc_attr((string) ($request['parking_location'] ?? '')) . '"></label></fieldset>';
+        echo '</div><label>Zeitslot <select name="availability_window">' . $this->options(['' => 'Nicht erfasst', 'morning' => 'Vormittag', 'afternoon' => 'Nachmittag', 'full_day' => 'Ganztägig'], (string) ($request['availability_window'] ?? '')) . '</select></label><label>Einsatzbereich <select name="venue_type">' . $this->options(['' => 'Nicht erfasst', 'indoor' => 'Innenraum', 'outdoor' => 'Außenbereich', 'both' => 'Innen- und Außenbereich'], (string) ($request['venue_type'] ?? '')) . '</select></label><label>Beschreibung Räumlichkeit Innenraum-Veranstaltung <textarea name="indoor_room_description">' . esc_textarea((string) ($request['indoor_room_description'] ?? '')) . '</textarea></label><label>Beschreibung Räumlichkeit Außen-Veranstaltung <textarea name="outdoor_area_description">' . esc_textarea((string) ($request['outdoor_area_description'] ?? '')) . '</textarea></label><label>Stellplatzart <select name="parking_type">' . $this->options(['' => 'Nicht erfasst', 'schoolyard' => 'Schulhof', 'parking_lot' => 'Parkplatz', 'street' => 'Straßenrand / Ladezone', 'other' => 'Sonstiger Stellplatz'], (string) ($request['parking_type'] ?? '')) . '</select></label><label>Google-Maps-Link zum Stellplatz <input type="url" name="parking_location" value="' . esc_attr((string) ($request['parking_location'] ?? '')) . '"></label>';
+        echo '<fieldset><legend>Präsentationstechnik</legend><div class="pov-choice-inline">';
+        foreach (['chalkboard' => 'Kreidetafel', 'projector' => 'Beamer', 'digital_display' => 'Digitale Tafel / Screen', 'other' => 'Sonstiges'] as $value => $label) {
+            echo '<label><input type="checkbox" name="presentation_equipment[]" value="' . esc_attr($value) . '" ' . checked(isset($presentationEquipment[$value]), true, false) . '> ' . esc_html($label) . '</label>';
+        }
+        echo '</div><label>Sonstige Präsentationstechnik <input name="presentation_equipment_other" value="' . esc_attr((string) ($request['presentation_equipment_other'] ?? '')) . '"></label></fieldset>';
+        echo '<fieldset><legend>Laptop-Anschlüsse</legend><div class="pov-choice-inline">';
+        foreach (['usb_c' => 'USB-C', 'usb_a' => 'USB Type A', 'other' => 'Sonstige'] as $value => $label) {
+            echo '<label><input type="checkbox" name="laptop_connections[]" value="' . esc_attr($value) . '" ' . checked(isset($laptopConnections[$value]), true, false) . '> ' . esc_html($label) . '</label>';
+        }
+        echo '</div><label>Sonstiger Laptop-Anschluss <input name="laptop_connection_other" value="' . esc_attr((string) ($request['laptop_connection_other'] ?? '')) . '"></label></fieldset></fieldset>';
         if ($appointment && (string) ($appointment['status'] ?? '') === 'confirmed') {
             echo '<label class="pov-danger-option"><input type="checkbox" name="cancel_appointment" value="1"> Termin stornieren</label><label>Grund der Stornierung <textarea name="cancellation_reason"></textarea></label>';
         }
@@ -1703,6 +1739,35 @@ final class Menu
             'street' => 'Straßenrand / Ladezone',
             'other' => 'Sonstiger Stellplatz',
         ][(string) ($request['parking_type'] ?? '')] ?? 'Nicht erfasst';
+        $facts += [
+            'Strom Technik' => $this->answerLabel((string) ($request['electricity_charging_available'] ?? '')),
+            'Wasser / Waschbecken' => $this->answerLabel((string) ($request['water_available'] ?? '')),
+            'Umkleidekabine' => $this->answerLabel((string) ($request['changing_room_available'] ?? '')),
+            'Duschmöglichkeit' => $this->answerLabel((string) ($request['shower_available'] ?? '')),
+            'Fluss / See in Laufnähe' => $this->answerLabel((string) ($request['natural_water_nearby'] ?? '')),
+            'WLAN' => $this->answerLabel((string) ($request['wifi_available'] ?? '')),
+        ];
+        if (in_array((string) ($request['venue_type'] ?? ''), ['outdoor', 'both'], true)) {
+            $facts['Strom Außenbereich'] = $this->answerLabel((string) ($request['electricity_outdoor_available'] ?? ''));
+            $facts['Schlechtwetteroption'] = $this->answerLabel((string) ($request['bad_weather_option_available'] ?? ''));
+        }
+        $presentation = $this->selectionLabels((string) ($request['presentation_equipment'] ?? ''), [
+            'chalkboard' => 'Kreidetafel',
+            'projector' => 'Beamer',
+            'digital_display' => 'Digitale Tafel / Screen',
+            'other' => 'Sonstiges',
+        ]);
+        if ($presentation !== '') {
+            $facts['Präsentationstechnik'] = $presentation;
+        }
+        $connections = $this->selectionLabels((string) ($request['laptop_connections'] ?? ''), [
+            'usb_c' => 'USB-C',
+            'usb_a' => 'USB Type A',
+            'other' => 'Sonstige',
+        ]);
+        if ($connections !== '') {
+            $facts['Laptop-Anschlüsse'] = $connections;
+        }
         $type = (string) ($request['institution_type'] ?? '');
         if ($type === 'Schule') {
             $facts += [
@@ -1727,11 +1792,15 @@ final class Menu
             'Klassenstunden und Pausen' => $request['school_schedule_notes'] ?? '',
             'Innenraum' => $request['indoor_room_description'] ?? '',
             'Außenfläche' => $request['outdoor_area_description'] ?? '',
-            'Stellplatz' => $request['parking_location'] ?? '',
+            'Sonstige Präsentationstechnik' => $request['presentation_equipment_other'] ?? '',
+            'Sonstiger Laptop-Anschluss' => $request['laptop_connection_other'] ?? '',
         ] as $label => $value) {
             if (trim((string) $value) !== '') {
                 echo '<p><strong>' . esc_html($label) . ':</strong><br>' . nl2br(esc_html((string) $value)) . '</p>';
             }
+        }
+        if (trim((string) ($request['parking_location'] ?? '')) !== '') {
+            echo '<p><strong>Stellplatz:</strong><br><a href="' . esc_url((string) $request['parking_location']) . '" target="_blank" rel="noopener">Google Maps öffnen</a></p>';
         }
         echo $this->warnings($request) . '</section>';
         return (string) ob_get_clean();
@@ -1749,19 +1818,26 @@ final class Menu
         ][$value] ?? 'Nicht erfasst';
     }
 
+    private function selectionLabels(string $csv, array $labels): string
+    {
+        $selected = array_values(array_filter(array_map('trim', explode(',', $csv))));
+        return implode(', ', array_map(static fn (string $value): string => $labels[$value] ?? $value, $selected));
+    }
+
     private function warnings(array $request): string
     {
         $fields = [
             'parking_available' => 'Parkplatz',
-            'electricity_available' => 'Strom',
-            'water_available' => 'Wasser',
+            'electricity_charging_available' => 'Strom Technik',
+            'water_available' => 'Wasser / Waschbecken',
         ];
         if (in_array((string) ($request['venue_type'] ?? ''), ['outdoor', 'both'], true)) {
             $fields['bad_weather_option_available'] = 'Schlechtwetter';
+            $fields['electricity_outdoor_available'] = 'Strom Außenbereich';
         }
         $out = '<div class="pov-chip-list">';
         foreach ($fields as $field => $label) {
-            $value = (string) $request[$field];
+            $value = (string) ($request[$field] ?? '');
             $out .= '<span class="pov-admin-chip ' . ($value === 'yes' ? 'is-ok' : 'is-warn') . '">' . esc_html($label . ': ' . $this->answerLabel($value)) . '</span>';
         }
         return $out . '</div>';

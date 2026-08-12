@@ -148,7 +148,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <label>Funktion
                     <input name="contact_role" required placeholder="z. B. Lehrkraft oder Veranstaltungsleitung">
                 </label>
-                <label>Website der Institution / Organisation
+                <label>Website der Institution / Organisation <small>(optional)</small>
                     <input type="url" name="institution_website" inputmode="url" autocomplete="url" placeholder="https://…">
                 </label>
                 <label class="pov-span-2">Straße
@@ -280,21 +280,31 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     </select>
                 </label>
                 <div class="pov-grid-2 pov-venue-details">
-                    <label data-venue-section="indoor" hidden>Räumlichkeit für den Inneneinsatz
+                    <label data-venue-section="indoor" hidden>Beschreibung Räumlichkeit Innenraum-Veranstaltung
                         <textarea name="indoor_room_description" data-venue-required placeholder="Größe, Zugang, Etage und Besonderheiten"></textarea>
                     </label>
-                    <label data-venue-section="outdoor" hidden>Fläche für den Außeneinsatz
+                    <label data-venue-section="outdoor" hidden>Beschreibung Räumlichkeit Außen-Veranstaltung
                         <textarea name="outdoor_area_description" data-venue-required placeholder="Untergrund, Größe, Zufahrt und Besonderheiten"></textarea>
                     </label>
                 </div>
+                <fieldset class="pov-choice-fieldset pov-question pov-fallback-question" data-venue-section="outdoor" hidden>
+                    <legend>Schlechtwetteroption vorhanden?</legend>
+                    <div>
+                        <label><input type="radio" name="bad_weather_option_available" value="yes" data-venue-required><span>Ja</span></label>
+                        <label><input type="radio" name="bad_weather_option_available" value="no"><span>Nein</span></label>
+                    </div>
+                </fieldset>
             </section>
 
             <div class="pov-questions">
                 <?php
                 $questions = [
                     'parking_available' => 'Parkplatz für den Van',
-                    'electricity_available' => 'Stromanschluss nahe am Veranstaltungsort und zum Laden der Technik',
                     'water_available' => 'Wasser oder Waschbecken',
+                    'changing_room_available' => 'Umkleidekabine',
+                    'shower_available' => 'Duschmöglichkeit',
+                    'natural_water_nearby' => 'Fluss oder See in Laufnähe',
+                    'wifi_available' => 'WLAN',
                 ];
                 foreach ($questions as $name => $label) :
                     ?>
@@ -307,17 +317,28 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     </fieldset>
                 <?php endforeach; ?>
                 <fieldset class="pov-choice-fieldset pov-question" data-venue-section="outdoor" hidden>
-                    <legend>Schlechtwetteroption für den Außeneinsatz</legend>
+                    <legend>Stromanschluss in der Nähe des Außenbereichs</legend>
                     <div>
-                        <label><input type="radio" name="bad_weather_option_available" value="yes" data-venue-required><span>Ja</span></label>
-                        <label><input type="radio" name="bad_weather_option_available" value="no"><span>Nein</span></label>
+                        <label><input type="radio" name="electricity_outdoor_available" value="yes" data-venue-required><span>Ja</span></label>
+                        <label><input type="radio" name="electricity_outdoor_available" value="no"><span>Nein</span></label>
+                    </div>
+                    <small>Maximale Entfernung entsprechend der verfügbaren Kabeltrommel.</small>
+                </fieldset>
+                <fieldset class="pov-choice-fieldset pov-question">
+                    <legend>Strom zum Laden der Technik
+                        <span class="pov-info-tip" tabindex="0" aria-label="Hinweis zum Stromanschluss">i<span role="tooltip">Für Laptop, VR-Technik, Wechselakkus und weitere Geräte.</span></span>
+                    </legend>
+                    <div>
+                        <label><input type="radio" name="electricity_charging_available" value="yes" required><span>Ja</span></label>
+                        <label><input type="radio" name="electricity_charging_available" value="no"><span>Nein</span></label>
                     </div>
                 </fieldset>
             </div>
 
             <section class="pov-detail-block pov-parking-block">
-                <h2>Van-Stellplatz</h2>
-                <p class="pov-fieldset-intro">Van-Maße: 6 m lang, 2,05 m breit und 2,522 m hoch. Gewicht je nach Beladung ca. 2,5–3,5 t.</p>
+                <h2>Van-Stellplatz
+                    <span class="pov-info-tip" tabindex="0" aria-label="Maße und Gewicht des Ocean Vans">i<span role="tooltip">Länge: 6 m, Breite: 2,05 m, Höhe: 2,522 m; je nach Beladung 2,5–3,5 Tonnen.</span></span>
+                </h2>
                 <div class="pov-grid-2" data-parking-details hidden>
                     <label>Art des Stellplatzes
                         <select name="parking_type" data-parking-required>
@@ -328,10 +349,37 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                             <option value="other">Sonstiger Stellplatz</option>
                         </select>
                     </label>
-                    <label>Adresse oder Google-Maps-Link
-                        <input name="parking_location" data-parking-required placeholder="Adresse oder https://maps.google.com/…">
+                    <label>Google-Maps-Link zum Stellplatz
+                        <input type="url" name="parking_location" data-parking-required placeholder="https://maps.google.com/…">
                     </label>
                 </div>
+            </section>
+
+            <section class="pov-detail-block" data-venue-section="indoor" hidden>
+                <h2>Technische Ausstattung Räumlichkeit</h2>
+                <fieldset class="pov-checklist-fieldset">
+                    <legend>Präsentation von Lehrinhalten an der Wand</legend>
+                    <div class="pov-checklist">
+                        <label><input type="checkbox" name="presentation_equipment[]" value="chalkboard"><span>Kreidetafel</span></label>
+                        <label><input type="checkbox" name="presentation_equipment[]" value="projector"><span>Beamer</span></label>
+                        <label><input type="checkbox" name="presentation_equipment[]" value="digital_display"><span>Digitale Tafel / Screen</span></label>
+                        <label><input type="checkbox" name="presentation_equipment[]" value="other" data-toggle-other="presentation"><span>Sonstiges</span></label>
+                    </div>
+                    <label data-other-field="presentation" hidden>Sonstige Präsentationstechnik
+                        <input name="presentation_equipment_other" placeholder="Bitte kurz beschreiben">
+                    </label>
+                </fieldset>
+                <fieldset class="pov-checklist-fieldset">
+                    <legend>Anschlussmöglichkeit Laptop</legend>
+                    <div class="pov-checklist">
+                        <label><input type="checkbox" name="laptop_connections[]" value="usb_c"><span>USB-C</span></label>
+                        <label><input type="checkbox" name="laptop_connections[]" value="usb_a"><span>USB Type A</span></label>
+                        <label><input type="checkbox" name="laptop_connections[]" value="other" data-toggle-other="laptop"><span>Sonstige</span></label>
+                    </div>
+                    <label data-other-field="laptop" hidden>Sonstiger Laptop-Anschluss
+                        <input name="laptop_connection_other" placeholder="Bitte kurz beschreiben">
+                    </label>
+                </fieldset>
             </section>
 
             <label>Hinweise zur Anfahrt

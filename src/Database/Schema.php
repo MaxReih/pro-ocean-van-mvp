@@ -6,7 +6,7 @@ namespace ProOceanVan\Database;
 
 final class Schema
 {
-    public const VERSION = '2026.08.12.1';
+    public const VERSION = '2026.08.12.2';
 
     /**
      * @return string[]
@@ -64,7 +64,17 @@ final class Schema
                 outdoor_area_description TEXT NULL,
                 bad_weather_option_available VARCHAR(16) NOT NULL,
                 electricity_available VARCHAR(16) NOT NULL,
+                electricity_outdoor_available VARCHAR(16) NOT NULL DEFAULT '',
+                electricity_charging_available VARCHAR(16) NOT NULL DEFAULT '',
                 water_available VARCHAR(16) NOT NULL,
+                changing_room_available VARCHAR(16) NOT NULL DEFAULT '',
+                shower_available VARCHAR(16) NOT NULL DEFAULT '',
+                natural_water_nearby VARCHAR(16) NOT NULL DEFAULT '',
+                presentation_equipment VARCHAR(255) NULL,
+                presentation_equipment_other VARCHAR(500) NULL,
+                laptop_connections VARCHAR(255) NULL,
+                laptop_connection_other VARCHAR(500) NULL,
+                wifi_available VARCHAR(16) NOT NULL DEFAULT '',
                 accessibility_notes TEXT NULL,
                 group_notes TEXT NULL,
                 general_notes TEXT NULL,
