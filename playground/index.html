@@ -80,7 +80,7 @@
     const status = document.querySelector('.status');
     const links = document.querySelectorAll('[data-demo]');
 
-    fetch('./blueprint.json')
+    fetch(`./blueprint.json?build=${Date.now()}`, { cache: 'no-store' })
       .then((response) => {
         if (!response.ok) throw new Error('Blueprint nicht erreichbar');
         return response.json();

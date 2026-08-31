@@ -27,8 +27,14 @@ jobs:
       - name: Demo erstellen
         shell: bash
         run: |
-          mkdir -p _site
-          cp playground/blueprint.template.json _site/blueprint.json
+          mkdir -p _site build/pro-ocean-van
+          cp -R pro-ocean-van.php uninstall.php readme.txt src templates assets build/pro-ocean-van/
+          PLUGIN_ARCHIVE="pro-ocean-van-${GITHUB_SHA}.zip"
+          cd build
+          zip -qr "../_site/${PLUGIN_ARCHIVE}" pro-ocean-van
+          cd ..
+          sed "s|__POV_PLUGIN_URL__|https://maxreih.github.io/pro-ocean-van-mvp/${PLUGIN_ARCHIVE}|g" \
+            playground/blueprint.template.json > _site/blueprint.json
           cp playground/index.html _site/index.html
           cp assets/brand/pro-ocean-symbol-blue.svg _site/pro-ocean-symbol-blue.svg
 

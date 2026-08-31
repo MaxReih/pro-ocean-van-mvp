@@ -18,7 +18,7 @@
       "step": "installPlugin",
       "pluginData": {
         "resource": "url",
-        "url": "https://github.com/MaxReih/pro-ocean-van-mvp/releases/latest/download/pro-ocean-van.zip"
+        "url": "__POV_PLUGIN_URL__"
       },
       "options": {
         "activate": true
