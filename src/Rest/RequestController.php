@@ -55,6 +55,7 @@ final class RequestController
         'venue_type' => 32,
         'indoor_room_description' => 5000,
         'outdoor_area_description' => 5000,
+        'electricity_outdoor_location' => 500,
         'presentation_equipment_other' => 500,
         'laptop_connection_other' => 500,
         'accessibility_notes' => 5000,
@@ -158,7 +159,7 @@ final class RequestController
             if (! in_array((string) ($payload['school_grade'] ?? ''), $grades, true) || $classCount === false || $teachersPerClass === false || $childrenPerClass === false) {
                 return 'Bitte prüfe Klassenstufe, Klassenanzahl und Gruppengröße.';
             }
-            if ($children !== $classCount * $childrenPerClass || $adults < $classCount * $teachersPerClass) {
+            if ($children !== $classCount * $childrenPerClass) {
                 return 'Bitte prüfe die Teilnehmenden- und Lehrpersonalzahlen.';
             }
         }

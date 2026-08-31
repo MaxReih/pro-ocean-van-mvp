@@ -719,8 +719,11 @@
       venueLabels[venue] || 'Einsatzbereich noch offen',
       form.elements.parking_type.options[form.elements.parking_type.selectedIndex]?.text || 'Stellplatz noch offen',
       form.elements.parking_location.value ? 'Stellplatz: Google-Maps-Link vorhanden' : 'Stellplatz: noch offen',
+      outdoor && form.elements.electricity_outdoor_location.value
+        ? 'Stromanschluss: ' + form.elements.electricity_outdoor_location.value
+        : '',
       outdoor && form.elements.electricity_outdoor_distance_m.value
-        ? 'Strom Außenbereich: ' + form.elements.electricity_outdoor_distance_m.value + ' m'
+        ? 'Kabellänge: ' + form.elements.electricity_outdoor_distance_m.value + ' m'
         : '',
       'Ladestrom: ' + answerLabel(radioValue('electricity_charging_available')),
       'Wasser: ' + answerLabel(radioValue('water_available'))
@@ -789,11 +792,7 @@
     if (type === 'Schule') {
       const classCount = Math.max(0, Number(form.elements.school_class_count.value || 0));
       const childrenPerClass = Math.max(0, Number(form.elements.school_children_per_class.value || 0));
-      const teachersPerClass = Math.max(0, Number(form.elements.school_teachers_per_class.value || 0));
       const adults = Math.max(0, Number(form.elements.school_adult_count.value || 0));
-      const adultMinimum = classCount * teachersPerClass;
-      form.elements.school_adult_count.min = String(adultMinimum);
-      form.elements.school_adult_count.setCustomValidity(adults < adultMinimum ? 'Bitte berücksichtigt mindestens das angegebene Lehrpersonal.' : '');
       return { children: classCount * childrenPerClass, adults: adults };
     }
     if (type === 'Veranstaltung') {
@@ -861,6 +860,7 @@
       parking_location: data.get('parking_location') || '',
       electricity_available: data.get('electricity_charging_available') || '',
       electricity_outdoor_available: '',
+      electricity_outdoor_location: outdoor ? data.get('electricity_outdoor_location') || '' : '',
       electricity_outdoor_distance_m: outdoor ? data.get('electricity_outdoor_distance_m') || '' : '',
       electricity_charging_available: data.get('electricity_charging_available') || '',
       water_available: data.get('water_available') || '',

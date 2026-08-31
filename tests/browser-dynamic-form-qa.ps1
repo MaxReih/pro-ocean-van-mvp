@@ -171,7 +171,7 @@ Invoke-BrowserExpression -Expression @'
         school_class_count: '2',
         school_teachers_per_class: '1',
         school_children_per_class: '20',
-        school_adult_count: '4',
+        school_adult_count: '1',
         school_needs: 'Zwei Klassen, barrierefreier Zugang erforderlich.'
     };
     Object.entries(values).forEach(([name, value]) => {
@@ -193,7 +193,7 @@ $school = Invoke-BrowserExpression -Expression @'
     participantTotal: document.querySelector('[name="participant_total"]')?.value
 }))()
 '@
-if (-not $school.schoolVisible -or -not $school.eventHidden -or -not $school.otherHidden -or $school.participantTotal -ne '44') {
+if (-not $school.schoolVisible -or -not $school.eventHidden -or -not $school.otherHidden -or $school.participantTotal -ne '41') {
     throw "Schuldynamik fehlgeschlagen: $($school | ConvertTo-Json -Compress)"
 }
 Save-BrowserScreenshot -FileName 'booking-school-fields.png'
@@ -213,14 +213,19 @@ if (-not $event.eventVisible -or -not $event.schoolHidden -or -not $event.ageFie
 
 Invoke-BrowserExpression -Expression @'
 (() => {
+    const form = document.querySelector('[data-role="form"]');
     const field = document.querySelector('[name="institution_type"]');
     field.value = 'Sonstiges';
     field.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.other_children_count.value = '0';
+    form.elements.other_adult_count.value = '1';
+    form.elements.occasion_description.value = 'Kleine interne Veranstaltung';
+    form.elements.other_adult_count.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
 })()
 '@ | Out-Null
-$other = Invoke-BrowserExpression -Expression '(() => ({otherVisible: !document.querySelector("[data-event-section=Sonstiges]")?.hidden, occasionEnabled: !document.querySelector("[name=occasion_description]")?.disabled}))()'
-if (-not $other.otherVisible -or -not $other.occasionEnabled) {
+$other = Invoke-BrowserExpression -Expression '(() => ({otherVisible: !document.querySelector("[data-event-section=Sonstiges]")?.hidden, occasionEnabled: !document.querySelector("[name=occasion_description]")?.disabled, participantTotal: document.querySelector("[name=participant_total]")?.value}))()'
+if (-not $other.otherVisible -or -not $other.occasionEnabled -or $other.participantTotal -ne '1') {
     throw "Sonstiges-Dynamik fehlgeschlagen: $($other | ConvertTo-Json -Compress)"
 }
 
@@ -255,9 +260,8 @@ Invoke-BrowserExpression -Expression @'
     form.elements.venue_type.dispatchEvent(new Event('change', { bubbles: true }));
     form.elements.indoor_room_description.value = 'Gro\u00dfer, ebener Mehrzweckraum im Erdgeschoss.';
     form.elements.outdoor_area_description.value = 'Befestigter Schulhof mit direkter Zufahrt.';
-    const parking = form.querySelector('[name="parking_available"][value="yes"]');
-    parking.checked = true;
-    parking.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.electricity_outdoor_location.value = 'Au\u00dfensteckdose am Nebengeb\u00e4ude';
+    form.elements.electricity_outdoor_distance_m.value = '25';
     form.elements.parking_type.value = 'schoolyard';
     form.elements.parking_location.value = 'https://www.google.com/maps/place/Musterstrasse+12';
     document.querySelector('.pov-parking-block').scrollIntoView({ block: 'center' });
@@ -271,13 +275,14 @@ $details = Invoke-BrowserExpression -Expression @'
     schoolScheduleVisible: !document.querySelector('[name="school_schedule_notes"]')?.closest('[data-event-section]')?.hidden,
     indoorVisible: !document.querySelector('[data-venue-section="indoor"]')?.hidden,
     outdoorVisible: !document.querySelector('[data-venue-section="outdoor"]')?.hidden,
-    parkingVisible: !document.querySelector('[data-parking-details]')?.hidden,
     schoolyard: Boolean(document.querySelector('[name="parking_type"] option[value="schoolyard"]')),
-    dimensions: document.querySelector('.pov-parking-block')?.textContent.includes('6 m lang'),
+    dimensions: document.querySelector('.pov-parking-block')?.textContent.includes('L\u00e4nge: 6 m'),
+    powerLocationVisible: Boolean(document.querySelector('[name="electricity_outdoor_location"]')?.offsetParent),
+    cableLengthVisible: Boolean(document.querySelector('[name="electricity_outdoor_distance_m"]')?.offsetParent),
     unclearChoices: Array.from(document.querySelectorAll('.pov-questions span')).filter((item) => item.textContent.trim() === 'Unklar').length
 }))()
 '@
-if (-not $details.timeWindowVisible -or -not $details.schoolScheduleVisible -or -not $details.indoorVisible -or -not $details.outdoorVisible -or -not $details.parkingVisible -or -not $details.schoolyard -or -not $details.dimensions -or $details.unclearChoices -ne 0) {
+if (-not $details.timeWindowVisible -or -not $details.schoolScheduleVisible -or -not $details.indoorVisible -or -not $details.outdoorVisible -or -not $details.schoolyard -or -not $details.dimensions -or -not $details.powerLocationVisible -or -not $details.cableLengthVisible -or $details.unclearChoices -ne 0) {
     throw "Detaildynamik fehlgeschlagen: $($details | ConvertTo-Json -Compress)"
 }
 Save-BrowserScreenshot -FileName 'booking-onsite-fields.png'

@@ -552,6 +552,7 @@ final class DemoDataService
             'indoor_room_available' => $data['indoor_room_available'] ?? 'yes',
             'bad_weather_option_available' => $data['bad_weather_option_available'] ?? 'yes',
             'electricity_available' => $data['electricity_available'] ?? 'yes',
+            'electricity_outdoor_location' => $data['electricity_outdoor_location'] ?? 'Außensteckdose am Gebäude',
             'electricity_outdoor_distance_m' => $data['electricity_outdoor_distance_m'] ?? 15,
             'electricity_charging_available' => $data['electricity_charging_available'] ?? 'yes',
             'water_available' => $data['water_available'] ?? 'yes',

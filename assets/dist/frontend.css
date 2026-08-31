@@ -1142,7 +1142,7 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-weekdays input,
-.pov-question input {
+.pov-question input[type="radio"] {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1166,14 +1166,14 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-weekdays input:checked + span,
-.pov-question input:checked + span {
+.pov-question input[type="radio"]:checked + span {
   color: var(--pov-white);
   background: var(--pov-blue);
   border-color: var(--pov-blue);
 }
 
 .pov-weekdays input:focus-visible + span,
-.pov-question input:focus-visible + span {
+.pov-question input[type="radio"]:focus-visible + span {
   outline: 3px solid rgba(19, 84, 118, .24);
   outline-offset: 2px;
 }
@@ -1181,23 +1181,23 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 .pov-questions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 22px;
+  gap: 20px;
+  margin-bottom: 28px;
 }
 
 .pov-question {
   display: grid;
-  gap: 10px;
+  gap: 14px;
   align-content: start;
   margin-top: 0 !important;
-  padding: 15px !important;
+  padding: 20px !important;
   background: var(--pov-ice);
   border: 1px solid var(--pov-mist) !important;
   border-radius: var(--pov-radius);
 }
 
 .pov-question > legend {
-  min-height: 42px;
+  min-height: 36px;
   margin-bottom: 0;
 }
 
@@ -1211,6 +1211,38 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 
 .pov-question label span {
   min-width: 0;
+  min-height: 50px;
+}
+
+.pov-power-question {
+  grid-column: 1 / -1;
+}
+
+.pov-power-fields {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px !important;
+}
+
+.pov-power-fields label {
+  display: grid;
+  gap: 8px;
+  color: var(--pov-ink);
+  font-size: .82rem;
+  font-weight: 750;
+}
+
+.pov-power-fields input {
+  position: static;
+  width: 100%;
+  height: auto;
+  min-height: 50px;
+  opacity: 1;
+}
+
+.pov-power-question > small {
+  color: rgba(0, 56, 82, .72);
+  line-height: 1.45;
 }
 
 .pov-consent {
@@ -1413,6 +1445,10 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   }
 
   .pov-questions {
+    grid-template-columns: 1fr;
+  }
+
+  .pov-power-fields {
     grid-template-columns: 1fr;
   }
 }

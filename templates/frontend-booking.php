@@ -315,9 +315,18 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         </div>
                     </fieldset>
                 <?php endforeach; ?>
-                <label class="pov-question pov-distance-field" data-venue-section="outdoor" hidden>Entfernung zum Stromanschluss im Außenbereich (Meter)
-                    <input type="number" min="0" max="5000" step="1" inputmode="numeric" name="electricity_outdoor_distance_m" placeholder="z. B. 15">
-                </label>
+                <fieldset class="pov-question pov-power-question" data-venue-section="outdoor" hidden>
+                    <legend>Stromanschluss im Außenbereich</legend>
+                    <div class="pov-power-fields">
+                        <label>Wo befindet sich der Anschluss?
+                            <input name="electricity_outdoor_location" maxlength="500" placeholder="z. B. Außensteckdose am Nebengebäude">
+                        </label>
+                        <label>Benötigte Kabellänge (Meter)
+                            <input type="number" min="0" max="5000" step="1" inputmode="numeric" name="electricity_outdoor_distance_m" placeholder="z. B. 15">
+                        </label>
+                    </div>
+                    <small>Beide Angaben sind optional und helfen bei der Vorbereitung des Außeneinsatzes.</small>
+                </fieldset>
                 <fieldset class="pov-choice-fieldset pov-question">
                     <legend>Strom zum Laden der Technik
                         <span class="pov-info-tip" tabindex="0" aria-label="Hinweis zum Stromanschluss">i<span role="tooltip">Für Laptop, VR-Technik, Wechselakkus und weitere Geräte.</span></span>
