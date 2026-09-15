@@ -41,6 +41,9 @@
     selectedDate: '',
     rangeFrom: '',
     rangeTo: '',
+    pendingCalendarStart: '',
+    pendingCalendarEnd: '',
+    pendingCalendarHasEnd: false,
     possibleWeekdays: ['mon', 'tue', 'wed', 'thu', 'fri'],
     mode: 'date_range',
     step: 1,
@@ -63,13 +66,13 @@
   const calendar = new window.POVCalendar(calendarElement, {
     initialMonth: state.month,
     onSelect: function (date) {
-      selectDate(date);
+      stageCalendarDate(date);
     },
     onDetails: function (date, row) {
       openWalkIn(date, row);
     },
     onRequest: function (date) {
-      requestCalendarDate(date);
+      stageCalendarDate(date);
     }
   });
 
@@ -193,9 +196,10 @@
       state.selectedDate = '';
       state.rangeFrom = '';
       state.rangeTo = '';
+      clearPendingCalendarSelection();
     }
     calendar.setRecommended([]);
-    if (typeof calendar.setSelected === 'function') calendar.setSelected('');
+    if (typeof calendar.setSelection === 'function') calendar.setSelection('', '');
     renderCalendar();
     renderSuggestionPlaceholder(title, text, 'warning');
   }
@@ -349,7 +353,8 @@
       button.textContent = 'Termin anfragen';
       button.setAttribute('aria-label', formatDate(item.date) + ' anfragen');
       button.addEventListener('click', function () {
-        selectDate(item.date);
+        stageCalendarDate(item.date);
+        revealCalendarSelection(item.date);
       });
       article.appendChild(button);
       suggestionsElement.appendChild(article);
@@ -416,7 +421,9 @@
         is_requestable: false
       });
     }));
-    if (typeof calendar.setSelected === 'function') calendar.setSelected(state.selectedDate);
+    const selectionStart = state.pendingCalendarStart || state.selectedDate || state.rangeFrom;
+    const selectionEnd = state.pendingCalendarEnd || state.selectedDate || state.rangeTo;
+    if (typeof calendar.setSelection === 'function') calendar.setSelection(selectionStart, selectionEnd);
     updateMonthButtons();
   }
 
@@ -463,51 +470,123 @@
     return false;
   }
 
-  function selectDate(date) {
+  function setPendingCalendarSelection(start, end, hasEnd) {
+    state.pendingCalendarStart = start;
+    state.pendingCalendarEnd = end || start;
+    state.pendingCalendarHasEnd = Boolean(hasEnd && end && end !== start);
+    renderCalendarSelection();
+    renderCalendar();
+  }
+
+  function clearPendingCalendarSelection() {
+    state.pendingCalendarStart = '';
+    state.pendingCalendarEnd = '';
+    state.pendingCalendarHasEnd = false;
+    const panel = $('[data-role="calendar-selection"]');
+    if (panel) panel.hidden = true;
+  }
+
+  function renderCalendarSelection() {
+    const panel = $('[data-role="calendar-selection"]');
+    if (!panel) return;
+    if (!state.pendingCalendarStart) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    const isRange = state.pendingCalendarHasEnd;
+    $('[data-role="calendar-selection-title"]').textContent = 'Auswahl noch bestätigen';
+    $('[data-role="calendar-selection-summary"]').textContent = isRange
+      ? formatDate(state.pendingCalendarStart, 'medium') + ' bis ' + formatDate(state.pendingCalendarEnd, 'medium')
+      : formatDate(state.pendingCalendarStart) + ' – weiteren Tag für Zeitraum wählen';
+    const confirm = $('[data-action="confirm-calendar-selection"]');
+    confirm.innerHTML = (isRange ? 'Zeitraum bestätigen' : 'Einzeltag bestätigen') + ' <span aria-hidden="true">→</span>';
+  }
+
+  function stageCalendarDate(date) {
     if (!ensureActiveRoute()) return;
-    state.mode = 'specific_date';
-    state.selectedDate = date;
-    state.rangeFrom = '';
-    state.rangeTo = '';
-    state.possibleWeekdays = [];
-    state.selectedRecommendation = state.recommendationByDate.get(date) || null;
-    if (typeof calendar.setSelected === 'function') calendar.setSelected(date);
+    if (!state.pendingCalendarStart || state.pendingCalendarHasEnd) {
+      setPendingCalendarSelection(date, date, false);
+      return;
+    }
+    if (date === state.pendingCalendarStart) {
+      setPendingCalendarSelection(date, date, false);
+      return;
+    }
+    const start = date < state.pendingCalendarStart ? date : state.pendingCalendarStart;
+    const end = date < state.pendingCalendarStart ? state.pendingCalendarStart : date;
+    setPendingCalendarSelection(start, end, true);
+  }
+
+  function revealCalendarSelection(date) {
+    const selected = new Date(date + 'T12:00:00');
+    const targetMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
+    if (targetMonth.getTime() !== state.month.getTime()) {
+      state.month = targetMonth;
+      loadCalendar();
+    }
+    $('[data-role="calendar-panel"]').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'center' });
+  }
+
+  function calendarWeekdays(start, end) {
+    const selected = new Set();
+    const cursor = new Date(start + 'T12:00:00');
+    const last = new Date(end + 'T12:00:00');
+    while (cursor <= last) {
+      selected.add(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][cursor.getDay()]);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter(function (day) { return selected.has(day); });
+  }
+
+  function syncRangeSelection(start, end, weekdays) {
+    rangeFrom.value = start;
+    rangeTo.value = end;
+    rangeTo.min = start;
+    $$('[data-range-weekday]').forEach(function (field) { field.checked = weekdays.includes(field.value); });
+  }
+
+  function confirmCalendarSelection() {
+    if (!state.pendingCalendarStart || !ensureActiveRoute()) return;
+    const start = state.pendingCalendarStart;
+    const end = state.pendingCalendarHasEnd ? state.pendingCalendarEnd : start;
+    const weekdays = calendarWeekdays(start, end);
+    state.selectedRecommendation = start === end ? (state.recommendationByDate.get(start) || null) : null;
+    if (start === end) {
+      state.mode = 'specific_date';
+      state.selectedDate = start;
+      state.rangeFrom = '';
+      state.rangeTo = '';
+      state.possibleWeekdays = [];
+    } else {
+      state.mode = 'date_range';
+      state.selectedDate = '';
+      state.rangeFrom = start;
+      state.rangeTo = end;
+      state.possibleWeekdays = weekdays;
+      syncRangeSelection(start, end, weekdays);
+    }
+    clearPendingCalendarSelection();
+    renderCalendar();
     openForm();
   }
 
-  function requestCalendarDate(date) {
-    if (!ensureActiveRoute()) return;
-    const weekday = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(date + 'T12:00:00').getDay()];
-    state.mode = 'date_range';
-    state.selectedDate = '';
-    state.rangeFrom = date;
-    state.rangeTo = date;
-    state.possibleWeekdays = [weekday];
-    rangeFrom.value = date;
-    rangeTo.value = date;
-    $$('[data-range-weekday]').forEach(function (field) { field.checked = field.value === weekday; });
-    openForm();
+  function selectCalendarWeek() {
+    if (!state.pendingCalendarStart) return;
+    const selected = new Date(state.pendingCalendarStart + 'T12:00:00');
+    const monday = new Date(selected);
+    monday.setDate(selected.getDate() - ((selected.getDay() + 6) % 7));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const start = monday < today ? today : monday;
+    const end = sunday > horizon ? horizon : sunday;
+    setPendingCalendarSelection(iso(start), iso(end), iso(start) !== iso(end));
   }
 
   function selectSuggestedWeek(week) {
     if (!ensureActiveRoute()) return;
-    const available = new Set(week.available_days || []);
-    state.mode = 'date_range';
-    state.selectedDate = '';
-    state.rangeFrom = week.date_from;
-    state.rangeTo = week.date_to;
-    rangeFrom.value = week.date_from;
-    rangeTo.value = week.date_to;
-    const selected = [];
-    $$('[data-range-weekday]').forEach(function (field) {
-      const hasDay = Array.from(available).some(function (date) {
-        return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(date + 'T12:00:00').getDay()] === field.value;
-      });
-      field.checked = hasDay;
-      if (hasDay) selected.push(field.value);
-    });
-    state.possibleWeekdays = selected;
-    openForm();
+    setPendingCalendarSelection(week.date_from, week.date_to, week.date_from !== week.date_to);
+    revealCalendarSelection(week.date_from);
   }
 
   function openWalkIn(date, row) {
@@ -573,7 +652,8 @@
     state.rangeTo = rangeTo.value;
     state.possibleWeekdays = weekdays;
     state.selectedRecommendation = null;
-    if (typeof calendar.setSelected === 'function') calendar.setSelected('');
+    clearPendingCalendarSelection();
+    renderCalendar();
     setRangeStatus('');
     openForm();
   }
@@ -1014,6 +1094,12 @@
     }
     if (action === 'check-route') checkRoute();
     if (action === 'close-walk-in') closeWalkIn();
+    if (action === 'clear-calendar-selection') {
+      clearPendingCalendarSelection();
+      renderCalendar();
+    }
+    if (action === 'select-calendar-week') selectCalendarWeek();
+    if (action === 'confirm-calendar-selection') confirmCalendarSelection();
     if (action === 'select-range') selectRange();
     if (action === 'back-route') backToRoute();
     if (action === 'recheck-form-route') recheckFormRoute();

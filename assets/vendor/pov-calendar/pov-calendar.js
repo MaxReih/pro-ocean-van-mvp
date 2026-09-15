@@ -6,7 +6,8 @@
       this.month = this.options.initialMonth || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       this.rows = new Map();
       this.recommended = new Set();
-      this.selected = '';
+      this.selectionStart = '';
+      this.selectionEnd = '';
     }
 
     setMonth(month) {
@@ -25,7 +26,12 @@
     }
 
     setSelected(date) {
-      this.selected = date || '';
+      this.setSelection(date, date);
+    }
+
+    setSelection(start, end) {
+      this.selectionStart = start || '';
+      this.selectionEnd = end || this.selectionStart;
       this.render();
     }
 
@@ -90,8 +96,16 @@
           year: 'numeric'
         }).format(new Date(`${date}T12:00:00`));
         const recommended = this.recommended.has(date) ? ', Routenfavorit' : '';
-        button.setAttribute('aria-label', `${readableDate}: ${row.public_label}${recommended}`);
-        button.setAttribute('aria-pressed', this.selected === date ? 'true' : 'false');
+        const inSelection = this.selectionStart && date >= this.selectionStart && date <= this.selectionEnd;
+        let selection = '';
+        if (inSelection && this.selectionStart === this.selectionEnd) selection = 'single';
+        else if (inSelection && date === this.selectionStart) selection = 'start';
+        else if (inSelection && date === this.selectionEnd) selection = 'end';
+        else if (inSelection) selection = 'range';
+        if (selection) button.dataset.selection = selection;
+        const selectedLabel = selection ? ', ausgewählt' : '';
+        button.setAttribute('aria-label', `${readableDate}: ${row.public_label}${recommended}${selectedLabel}`);
+        button.setAttribute('aria-pressed', inSelection ? 'true' : 'false');
         button.innerHTML = `<strong>${d}</strong><small>${POVCalendar.escape(row.public_label)}</small>`;
         button.addEventListener('click', () => {
           if (row.is_interactive && this.options.onDetails) {

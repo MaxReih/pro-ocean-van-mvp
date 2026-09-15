@@ -68,7 +68,18 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </div>
                 <div class="pov-live pov-calendar-status" role="status" aria-live="polite" data-role="calendar-status"></div>
                 <div class="pov-calendar" data-role="calendar" role="group" aria-label="Verfügbare Besuchstage" aria-busy="false"></div>
-                <p class="pov-calendar-hint">Der Kalender zeigt einzelne Besuchstage. Für mehrere mögliche Tage nutzt bitte den Wunschzeitraum.</p>
+                <p class="pov-calendar-hint">Tag anklicken, optional Zeitraum oder Woche wählen und anschließend bestätigen.</p>
+                <div class="pov-calendar-selection" data-role="calendar-selection" aria-live="polite" hidden>
+                    <div class="pov-calendar-selection-copy">
+                        <strong data-role="calendar-selection-title">Auswahl noch bestätigen</strong>
+                        <span data-role="calendar-selection-summary"></span>
+                    </div>
+                    <div class="pov-calendar-selection-actions">
+                        <button type="button" class="pov-text-button" data-action="clear-calendar-selection">Auswahl löschen</button>
+                        <button type="button" class="pov-secondary-button" data-action="select-calendar-week">Ganze Woche wählen</button>
+                        <button type="button" class="pov-button" data-action="confirm-calendar-selection">Einzeltag bestätigen <span aria-hidden="true">→</span></button>
+                    </div>
+                </div>
                 <div class="pov-legend" aria-label="Kalenderlegende">
                     <span><i class="is-available"></i>Verfügbar</span>
                     <span><i class="is-limited"></i>Auf Anfrage</span>
