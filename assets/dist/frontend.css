@@ -425,6 +425,16 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   gap: 10px;
 }
 
+.pov-section-note,
+.pov-recommendation-help {
+  color: var(--pov-muted);
+  font-size: .9rem;
+}
+
+.pov-recommendation-help {
+  margin: 12px 0 18px;
+}
+
 .pov-empty-state {
   display: grid;
   gap: 4px;
@@ -461,6 +471,11 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 .pov-suggestion.is-best {
   background: linear-gradient(135deg, rgba(245, 219, 162, .45), var(--pov-white));
   border-color: var(--pov-sand);
+}
+
+.pov-suggestion.is-week {
+  background: var(--pov-sky);
+  border-style: dashed;
 }
 
 .pov-suggestion.is-top-date {
@@ -575,6 +590,23 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 .pov-range-panel > h3 {
   margin-bottom: 16px;
   font-size: 1.35rem;
+}
+
+.pov-team-facilities > p {
+  margin: -8px 0 16px;
+  color: var(--pov-muted);
+}
+
+.pov-natural-water-link {
+  display: grid;
+  align-content: center;
+  gap: 7px;
+}
+
+.pov-walk-in-dialog a.pov-button:link,
+.pov-walk-in-dialog a.pov-button:visited {
+  color: var(--pov-white);
+  text-decoration: none;
 }
 
 .pov-range-panel fieldset {
@@ -698,8 +730,13 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 
 .pov-day[data-state="unavailable"] {
   color: var(--pov-red);
-  background: var(--pov-white);
+  background: #fbe7e4;
   border-color: var(--pov-red);
+  opacity: 1;
+}
+
+.pov-day[data-state="limited"][data-requestable="true"] {
+  cursor: pointer;
 }
 
 .pov-day[data-state="past"] {

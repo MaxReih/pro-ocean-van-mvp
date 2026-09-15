@@ -67,6 +67,9 @@
     },
     onDetails: function (date, row) {
       openWalkIn(date, row);
+    },
+    onRequest: function (date) {
+      requestCalendarDate(date);
     }
   });
 
@@ -282,7 +285,10 @@
       state.eligibilityToken = typeof data.eligibility_token === 'string' ? data.eligibility_token : '';
       copyRouteRegionToForm();
       markRouteFresh();
-      renderSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+      renderSuggestions(
+        Array.isArray(data.suggestions) ? data.suggestions : [],
+        Array.isArray(data.week_suggestions) ? data.week_suggestions : []
+      );
       renderCalendar();
       setRouteStatus(data.fallback ? (data.message || 'Bitte Zeitraum anfragen.') : 'Route geprüft.', data.fallback ? 'warning' : 'success');
     } catch (error) {
@@ -307,7 +313,7 @@
     }
   }
 
-  function renderSuggestions(items) {
+  function renderSuggestions(items, weeks) {
     const best = items.filter(function (item) {
       return item && typeof item.date === 'string' && item.date >= iso(firstSuggestedDate);
     }).slice(0, 2);
@@ -334,14 +340,37 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = index === 0 ? 'pov-button' : 'pov-secondary-button';
-      button.textContent = 'Termin wählen';
-      button.setAttribute('aria-label', formatDate(item.date) + ' wählen');
+      if (index === 0) {
+        const tag = document.createElement('span');
+        tag.className = 'pov-suggestion-tag';
+        tag.textContent = 'Beste Routenoption';
+        article.querySelector('.pov-suggestion-copy').appendChild(tag);
+      }
+      button.textContent = 'Termin anfragen';
+      button.setAttribute('aria-label', formatDate(item.date) + ' anfragen');
       button.addEventListener('click', function () {
         selectDate(item.date);
       });
       article.appendChild(button);
       suggestionsElement.appendChild(article);
     });
+
+    const week = Array.isArray(weeks) ? weeks.find(function (item) {
+      return item && Array.isArray(item.available_days) && item.available_days.length > 1;
+    }) : null;
+    if (week) {
+      const article = document.createElement('article');
+      article.className = 'pov-suggestion is-week';
+      article.innerHTML = '<div class="pov-suggestion-copy"><h3>' + escapeHtml(week.label || 'Passende Woche') +
+        '</h3><p>' + week.available_days.length + ' mögliche Tage</p></div>';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pov-secondary-button';
+      button.textContent = 'Woche anfragen';
+      button.addEventListener('click', function () { selectSuggestedWeek(week); });
+      article.appendChild(button);
+      suggestionsElement.appendChild(article);
+    }
   }
 
   function monthBounds() {
@@ -383,7 +412,8 @@
       return Object.assign({}, row, {
         public_state: 'geo_unavailable',
         public_label: 'Für diese Route nicht verfügbar',
-        is_selectable: false
+        is_selectable: false,
+        is_requestable: false
       });
     }));
     if (typeof calendar.setSelected === 'function') calendar.setSelected(state.selectedDate);
@@ -442,6 +472,41 @@
     state.possibleWeekdays = [];
     state.selectedRecommendation = state.recommendationByDate.get(date) || null;
     if (typeof calendar.setSelected === 'function') calendar.setSelected(date);
+    openForm();
+  }
+
+  function requestCalendarDate(date) {
+    if (!ensureActiveRoute()) return;
+    const weekday = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(date + 'T12:00:00').getDay()];
+    state.mode = 'date_range';
+    state.selectedDate = '';
+    state.rangeFrom = date;
+    state.rangeTo = date;
+    state.possibleWeekdays = [weekday];
+    rangeFrom.value = date;
+    rangeTo.value = date;
+    $$('[data-range-weekday]').forEach(function (field) { field.checked = field.value === weekday; });
+    openForm();
+  }
+
+  function selectSuggestedWeek(week) {
+    if (!ensureActiveRoute()) return;
+    const available = new Set(week.available_days || []);
+    state.mode = 'date_range';
+    state.selectedDate = '';
+    state.rangeFrom = week.date_from;
+    state.rangeTo = week.date_to;
+    rangeFrom.value = week.date_from;
+    rangeTo.value = week.date_to;
+    const selected = [];
+    $$('[data-range-weekday]').forEach(function (field) {
+      const hasDay = Array.from(available).some(function (date) {
+        return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(date + 'T12:00:00').getDay()] === field.value;
+      });
+      field.checked = hasDay;
+      if (hasDay) selected.push(field.value);
+    });
+    state.possibleWeekdays = selected;
     openForm();
   }
 
@@ -513,29 +578,10 @@
     openForm();
   }
 
-  function toggleOptionPanel(name) {
-    const calendarPanel = $('[data-role="calendar-panel"]');
-    const rangePanel = $('[data-role="range-panel"]');
-    const rangeButton = $('[data-action="toggle-range"]');
-    const willOpen = rangePanel.hidden;
-
-    calendarPanel.hidden = false;
-    rangePanel.hidden = !willOpen;
-    rangeButton.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-    rangeButton.textContent = rangePanel.hidden ? 'Zeitraum anfragen' : 'Zeitraum schließen';
-
-    if (willOpen) {
-      const heading = rangePanel.querySelector('h3');
-      window.requestAnimationFrame(function () {
-        if (heading) heading.focus({ preventScroll: true });
-        rangePanel.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'nearest' });
-      });
-    }
-  }
-
   function selectedDateLabel() {
     if (state.mode === 'specific_date') return formatDate(state.selectedDate);
     if (state.rangeFrom && state.rangeTo) {
+      if (state.rangeFrom === state.rangeTo) return formatDate(state.rangeFrom);
       return formatDate(state.rangeFrom, 'medium') + ' bis ' + formatDate(state.rangeTo, 'medium');
     }
     return 'Noch offen';
@@ -714,6 +760,7 @@
     const availabilityLabels = { morning: 'Vormittag', afternoon: 'Nachmittag', full_day: 'Ganztägig' };
     const venueLabels = { indoor: 'Innenraum', outdoor: 'Außenbereich', both: 'Innen- und Außenbereich' };
     const venue = form.elements.venue_type.value;
+    const outdoor = venue === 'outdoor' || venue === 'both';
     const onsite = [
       availabilityLabels[form.elements.availability_window.value] || 'Zeit noch offen',
       venueLabels[venue] || 'Einsatzbereich noch offen',
@@ -837,6 +884,7 @@
       school_children_per_class: type === 'Schule' ? Number(data.get('school_children_per_class') || 0) : '',
       school_needs: type === 'Schule' ? data.get('school_needs') || '' : '',
       school_schedule_notes: type === 'Schule' ? data.get('school_schedule_notes') || '' : '',
+      school_lesson_duration: type === 'Schule' ? data.get('school_lesson_duration') || '' : '',
       event_child_age_range: type === 'Veranstaltung' ? data.get('event_child_age_range') || '' : '',
       occasion_description: type === 'Sonstiges' ? data.get('occasion_description') || '' : '',
       availability_window: data.get('availability_window') || '',
@@ -867,6 +915,7 @@
       changing_room_available: data.get('changing_room_available') || '',
       shower_available: data.get('shower_available') || '',
       natural_water_nearby: data.get('natural_water_nearby') || '',
+      natural_water_location: data.get('natural_water_location') || '',
       presentation_equipment: data.getAll('presentation_equipment[]'),
       presentation_equipment_other: data.getAll('presentation_equipment[]').includes('other') ? data.get('presentation_equipment_other') || '' : '',
       laptop_connections: data.getAll('laptop_connections[]'),
@@ -964,7 +1013,6 @@
       loadCalendar();
     }
     if (action === 'check-route') checkRoute();
-    if (action === 'toggle-range') toggleOptionPanel('range');
     if (action === 'close-walk-in') closeWalkIn();
     if (action === 'select-range') selectRange();
     if (action === 'back-route') backToRoute();
@@ -999,6 +1047,14 @@
   form.elements.venue_type.addEventListener('change', updateVenueSections);
   $$('[data-toggle-other]', form).forEach(function (field) {
     field.addEventListener('change', updateOtherFields);
+  });
+  $$('input[name="natural_water_nearby"]', form).forEach(function (field) {
+    field.addEventListener('change', function () {
+      const wrapper = $('[data-natural-water-location]', form);
+      const visible = radioValue('natural_water_nearby') === 'yes';
+      wrapper.hidden = !visible;
+      wrapper.querySelector('input').disabled = !visible;
+    });
   });
   ['street', 'house_number', 'city'].forEach(function (name) {
     form.elements[name].addEventListener('change', trackAddressChange);

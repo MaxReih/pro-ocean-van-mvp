@@ -22,7 +22,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
     <section class="pov-route-screen" data-screen="route" aria-labelledby="pov-route-heading">
         <div class="pov-panel pov-route-panel">
             <div class="pov-section-heading">
-                <h2 id="pov-route-heading" tabindex="-1">Einsatzort</h2>
+                <h2 id="pov-route-heading" tabindex="-1">Euer Einsatzort</h2>
             </div>
 
             <div class="pov-region">
@@ -46,20 +46,19 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
             <section class="pov-recommendations" aria-labelledby="pov-recommendation-title">
                 <div class="pov-subheading">
                     <div>
-                        <strong id="pov-recommendation-title" class="pov-section-title">Empfohlene Termine</strong>
+                        <strong id="pov-recommendation-title" class="pov-section-title">Unsere Terminvorschläge</strong>
+                        <span class="pov-section-note">Routenoptimiert und mindestens zwei Wochen im Voraus.</span>
                     </div>
                 </div>
                 <div class="pov-suggestions" data-role="suggestions" aria-live="polite" aria-busy="false">
                     <div class="pov-empty-state">
                         <strong>Gebt euren Ort ein.</strong>
-                        <span>Dann zeigen wir die zwei besten Tage.</span>
+                        <span>Dann zeigen wir passende Tage und Wochen.</span>
                     </div>
                 </div>
             </section>
 
-            <div class="pov-route-alternatives" aria-label="Weitere Terminoptionen">
-                <button type="button" class="pov-secondary-button" data-action="toggle-range" aria-expanded="false" aria-controls="pov-range-panel">Zeitraum anfragen</button>
-            </div>
+            <p class="pov-recommendation-help">Kein passender Termin? Kalender oder Wunschzeitraum nutzen.</p>
 
             <section class="pov-option-panel" id="pov-calendar-panel" data-role="calendar-panel" aria-labelledby="pov-calendar-title">
                 <div class="pov-calendar-toolbar">
@@ -70,7 +69,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <div class="pov-live pov-calendar-status" role="status" aria-live="polite" data-role="calendar-status"></div>
                 <div class="pov-calendar" data-role="calendar" role="group" aria-label="Verfügbare Besuchstage" aria-busy="false"></div>
                 <div class="pov-legend" aria-label="Kalenderlegende">
-                    <span><i class="is-available"></i>Noch verfügbar</span>
+                    <span><i class="is-available"></i>Verfügbar</span>
                     <span><i class="is-limited"></i>Auf Anfrage</span>
                     <span><i class="is-tour"></i>Van unterwegs</span>
                     <span><i class="is-walk-in"></i>Öffentliches Event</span>
@@ -78,7 +77,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </div>
             </section>
 
-            <section class="pov-option-panel pov-range-panel" id="pov-range-panel" data-role="range-panel" aria-labelledby="pov-range-title" hidden>
+            <section class="pov-option-panel pov-range-panel" id="pov-range-panel" data-role="range-panel" aria-labelledby="pov-range-title">
                 <h3 id="pov-range-title" tabindex="-1">Euer Wunschzeitraum</h3>
                 <div class="pov-grid-2">
                     <label>Frühester Termin
@@ -96,6 +95,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         <label><input type="checkbox" data-range-weekday value="wed"><span>Mi</span></label>
                         <label><input type="checkbox" data-range-weekday value="thu"><span>Do</span></label>
                         <label><input type="checkbox" data-range-weekday value="fri"><span>Fr</span></label>
+                        <label><input type="checkbox" data-range-weekday value="sat"><span>Sa</span></label>
+                        <label><input type="checkbox" data-range-weekday value="sun"><span>So</span></label>
                     </div>
                 </fieldset>
                 <div class="pov-live" role="status" aria-live="polite" data-role="range-status"></div>
@@ -179,12 +180,14 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     <label>Klassenstufe / Alter
                         <select name="school_grade" data-type-required>
                             <option value="">Bitte auswählen</option>
-                            <option value="preschool">Vorschule</option>
-                            <?php for ($grade = 1; $grade <= 13; $grade++) : ?>
+                            <?php
+                            $schoolGrades = array_filter(array_map('trim', explode(',', (string) get_option('pov_school_grade_options', '3,4'))));
+                            $schoolGrades = array_values(array_filter($schoolGrades, static fn (string $grade): bool => ctype_digit($grade) && (int) $grade >= 1 && (int) $grade <= 13));
+                            $schoolGrades = $schoolGrades ?: ['3', '4'];
+                            foreach ($schoolGrades as $grade) :
+                            ?>
                                 <option value="grade_<?php echo esc_attr((string) $grade); ?>"><?php echo esc_html((string) $grade . '. Klasse'); ?></option>
-                            <?php endfor; ?>
-                            <option value="vocational">Berufsschule</option>
-                            <option value="mixed">Altersgemischt</option>
+                            <?php endforeach; ?>
                         </select>
                     </label>
                     <label>Anzahl Klassen
@@ -265,6 +268,14 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     <label data-event-section="Schule" hidden>Hinweise / Wünsche zur zeitlichen Planung
                         <textarea name="school_schedule_notes" placeholder="z. B. Unterrichtszeiten, Pausen oder besondere Zeitfenster"></textarea>
                     </label>
+                    <label data-event-section="Schule" hidden>Dauer einer Unterrichtseinheit
+                        <select name="school_lesson_duration" data-type-required>
+                            <option value="">Bitte auswählen</option>
+                            <option value="45">45 Minuten</option>
+                            <option value="60">60 Minuten</option>
+                            <option value="90">90 Minuten</option>
+                        </select>
+                    </label>
                 </div>
                 <p class="pov-planning-note">Für Aufbau und Vorbereitung benötigen wir mindestens 1 Stunde vor Veranstaltungsbeginn Zugang zur Räumlichkeit bzw. Fläche.</p>
             </section>
@@ -300,8 +311,6 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <?php
                 $questions = [
                     'water_available' => 'Wasser oder Waschbecken',
-                    'changing_room_available' => 'Umkleidekabine',
-                    'shower_available' => 'Duschmöglichkeit',
                     'natural_water_nearby' => 'Fluss oder See in Laufnähe',
                     'wifi_available' => 'WLAN',
                 ];
@@ -315,6 +324,9 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                         </div>
                     </fieldset>
                 <?php endforeach; ?>
+                <label class="pov-question pov-natural-water-link" data-natural-water-location hidden>Google-Maps-Link zu Fluss oder See <small>(optional)</small>
+                    <input type="url" name="natural_water_location" placeholder="https://maps.google.com/…">
+                </label>
                 <fieldset class="pov-question pov-power-question" data-venue-section="outdoor" hidden>
                     <legend>Stromanschluss im Außenbereich</legend>
                     <div class="pov-power-fields">
@@ -377,12 +389,29 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     <div class="pov-checklist">
                         <label><input type="checkbox" name="laptop_connections[]" value="usb_c"><span>USB-C</span></label>
                         <label><input type="checkbox" name="laptop_connections[]" value="usb_a"><span>USB Type A</span></label>
+                        <label><input type="checkbox" name="laptop_connections[]" value="hdmi"><span>HDMI</span></label>
                         <label><input type="checkbox" name="laptop_connections[]" value="other" data-toggle-other="laptop"><span>Sonstige</span></label>
                     </div>
                     <label data-other-field="laptop" hidden>Sonstiger Laptop-Anschluss
                         <input name="laptop_connection_other" placeholder="Bitte kurz beschreiben">
                     </label>
                 </fieldset>
+            </section>
+
+            <section class="pov-detail-block pov-team-facilities">
+                <h2>Für das Ocean-Van-Team <small>(optional)</small></h2>
+                <p>Hilft uns bei längeren Einsatztagen und Tourstopps.</p>
+                <div class="pov-questions">
+                    <?php foreach (['changing_room_available' => 'Umkleidekabine', 'shower_available' => 'Duschmöglichkeit'] as $name => $label) : ?>
+                        <fieldset class="pov-choice-fieldset pov-question">
+                            <legend><?php echo esc_html($label); ?></legend>
+                            <div>
+                                <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="yes"><span>Ja</span></label>
+                                <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="no"><span>Nein</span></label>
+                            </div>
+                        </fieldset>
+                    <?php endforeach; ?>
+                </div>
             </section>
 
             <label>Hinweise zur Anfahrt

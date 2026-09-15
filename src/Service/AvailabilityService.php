@@ -42,6 +42,7 @@ final class AvailabilityService
                     'public_city' => '',
                     'is_weekend' => $isWeekend,
                     'is_selectable' => false,
+                    'is_requestable' => false,
                 ];
                 continue;
             }
@@ -55,6 +56,7 @@ final class AvailabilityService
                     'public_city' => '',
                     'is_weekend' => $isWeekend,
                     'is_selectable' => false,
+                    'is_requestable' => false,
                     'is_interactive' => true,
                     'public_event' => [
                         'title' => $title !== '' ? $title : 'Öffentliches Event',
@@ -88,6 +90,7 @@ final class AvailabilityService
                 'public_city' => '',
                 'is_weekend' => $isWeekend,
                 'is_selectable' => ! $isWeekend && $state !== CalendarState::UNAVAILABLE && $day >= $today,
+                'is_requestable' => $isWeekend && $state === CalendarState::LIMITED && $day >= $today,
                 'is_interactive' => false,
             ];
         }
@@ -100,7 +103,7 @@ final class AvailabilityService
         return match ($state) {
             CalendarState::LIMITED => 'Auf Anfrage',
             CalendarState::UNAVAILABLE => 'Nicht buchbar',
-            default => 'Noch verfügbar',
+            default => 'Verfügbar',
         };
     }
 

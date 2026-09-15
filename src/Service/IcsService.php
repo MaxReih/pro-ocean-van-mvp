@@ -6,6 +6,41 @@ namespace ProOceanVan\Service;
 
 final class IcsService
 {
+    public function publicEvent(array $event): string
+    {
+        $date = (string) ($event['calendar_date'] ?? '');
+        $compactDate = str_replace('-', '', $date);
+        return implode("\r\n", [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Pro Ocean//Ocean Van Planner//DE',
+            'CALSCALE:GREGORIAN',
+            'BEGIN:VEVENT',
+            'UID:pov-public-' . (string) ($event['id'] ?? '') . '@' . wp_parse_url(home_url(), PHP_URL_HOST),
+            'DTSTAMP:' . gmdate('Ymd\THis\Z'),
+            'DTSTART;VALUE=DATE:' . $compactDate,
+            'DTEND;VALUE=DATE:' . date('Ymd', strtotime($date . ' +1 day')),
+            'SUMMARY:' . $this->escape('Ocean Van - ' . (string) ($event['public_title'] ?? 'Öffentliches Event')),
+            'LOCATION:' . $this->escape((string) ($event['public_location'] ?? '')),
+            'DESCRIPTION:' . $this->escape(trim((string) ($event['public_description'] ?? '') . "\n" . (string) ($event['public_url'] ?? ''))),
+            'END:VEVENT',
+            'END:VCALENDAR',
+            '',
+        ]);
+    }
+
+    public function googlePublicEventLink(array $event): string
+    {
+        $date = (string) ($event['calendar_date'] ?? '');
+        return add_query_arg([
+            'action' => 'TEMPLATE',
+            'text' => 'Ocean Van - ' . (string) ($event['public_title'] ?? 'Öffentliches Event'),
+            'dates' => str_replace('-', '', $date) . '/' . date('Ymd', strtotime($date . ' +1 day')),
+            'location' => (string) ($event['public_location'] ?? ''),
+            'details' => trim((string) ($event['public_description'] ?? '') . "\n" . (string) ($event['public_url'] ?? '')),
+        ], 'https://calendar.google.com/calendar/render');
+    }
+
     public function appointment(array $appointment, array $request = []): string
     {
         $date = str_replace('-', '', (string) $appointment['appointment_date']);

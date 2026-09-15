@@ -33,7 +33,7 @@ final class RequestRepository
             'desired_date_to' => $mode === 'date_range' ? $this->dateOrNull($payload['desired_date_to'] ?? null) : null,
             'possible_weekdays' => implode(',', array_values(array_intersect(
                 array_map('sanitize_key', (array) ($payload['possible_weekdays'] ?? [])),
-                ['mon', 'tue', 'wed', 'thu', 'fri']
+                ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
             ))),
             'institution_name' => sanitize_text_field((string) ($payload['institution_name'] ?? '')),
             'institution_type' => sanitize_text_field((string) ($payload['institution_type'] ?? '')),
@@ -48,6 +48,7 @@ final class RequestRepository
             'school_children_per_class' => $this->positiveIntOrNull($payload['school_children_per_class'] ?? null),
             'school_needs' => sanitize_textarea_field((string) ($payload['school_needs'] ?? '')),
             'school_schedule_notes' => sanitize_textarea_field((string) ($payload['school_schedule_notes'] ?? '')),
+            'school_lesson_duration' => $this->allowedValue($payload['school_lesson_duration'] ?? '', ['45', '60', '90']),
             'event_child_age_range' => sanitize_text_field((string) ($payload['event_child_age_range'] ?? '')),
             'occasion_description' => sanitize_textarea_field((string) ($payload['occasion_description'] ?? '')),
             'availability_window' => $this->allowedValue($payload['availability_window'] ?? '', ['morning', 'afternoon', 'full_day']),
@@ -79,9 +80,10 @@ final class RequestRepository
             'changing_room_available' => $this->availabilityAnswer($payload['changing_room_available'] ?? ''),
             'shower_available' => $this->availabilityAnswer($payload['shower_available'] ?? ''),
             'natural_water_nearby' => $this->availabilityAnswer($payload['natural_water_nearby'] ?? ''),
+            'natural_water_location' => esc_url_raw((string) ($payload['natural_water_location'] ?? '')),
             'presentation_equipment' => $this->allowedValuesCsv($payload['presentation_equipment'] ?? [], ['chalkboard', 'projector', 'digital_display', 'other']),
             'presentation_equipment_other' => sanitize_text_field((string) ($payload['presentation_equipment_other'] ?? '')),
-            'laptop_connections' => $this->allowedValuesCsv($payload['laptop_connections'] ?? [], ['usb_c', 'usb_a', 'other']),
+            'laptop_connections' => $this->allowedValuesCsv($payload['laptop_connections'] ?? [], ['usb_c', 'usb_a', 'hdmi', 'other']),
             'laptop_connection_other' => sanitize_text_field((string) ($payload['laptop_connection_other'] ?? '')),
             'wifi_available' => $this->availabilityAnswer($payload['wifi_available'] ?? ''),
             'accessibility_notes' => sanitize_textarea_field((string) ($payload['accessibility_notes'] ?? '')),
@@ -263,7 +265,7 @@ final class RequestRepository
         $to = $mode === 'date_range' ? $this->dateOrNull($data['desired_date_to'] ?? null) : null;
         $weekdays = array_values(array_intersect(
             array_map('sanitize_key', (array) ($data['possible_weekdays'] ?? [])),
-            ['mon', 'tue', 'wed', 'thu', 'fri']
+            ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
         ));
         if (($mode === 'specific_date' && ! $specific)
             || ($mode === 'date_range' && (! $from || ! $to || $from > $to || ! $weekdays))) {
@@ -294,6 +296,7 @@ final class RequestRepository
             'school_children_per_class' => $this->positiveIntOrNull($data['school_children_per_class'] ?? null),
             'school_needs' => sanitize_textarea_field((string) ($data['school_needs'] ?? '')),
             'school_schedule_notes' => sanitize_textarea_field((string) ($data['school_schedule_notes'] ?? '')),
+            'school_lesson_duration' => $this->allowedValue($data['school_lesson_duration'] ?? '', ['45', '60', '90']),
             'event_child_age_range' => sanitize_text_field((string) ($data['event_child_age_range'] ?? '')),
             'occasion_description' => sanitize_textarea_field((string) ($data['occasion_description'] ?? '')),
             'availability_window' => $this->allowedValue($data['availability_window'] ?? '', ['morning', 'afternoon', 'full_day']),
@@ -319,9 +322,10 @@ final class RequestRepository
             'changing_room_available' => $this->availabilityAnswer($data['changing_room_available'] ?? ''),
             'shower_available' => $this->availabilityAnswer($data['shower_available'] ?? ''),
             'natural_water_nearby' => $this->availabilityAnswer($data['natural_water_nearby'] ?? ''),
+            'natural_water_location' => esc_url_raw((string) ($data['natural_water_location'] ?? '')),
             'presentation_equipment' => $this->allowedValuesCsv($data['presentation_equipment'] ?? [], ['chalkboard', 'projector', 'digital_display', 'other']),
             'presentation_equipment_other' => sanitize_text_field((string) ($data['presentation_equipment_other'] ?? '')),
-            'laptop_connections' => $this->allowedValuesCsv($data['laptop_connections'] ?? [], ['usb_c', 'usb_a', 'other']),
+            'laptop_connections' => $this->allowedValuesCsv($data['laptop_connections'] ?? [], ['usb_c', 'usb_a', 'hdmi', 'other']),
             'laptop_connection_other' => sanitize_text_field((string) ($data['laptop_connection_other'] ?? '')),
             'wifi_available' => $this->availabilityAnswer($data['wifi_available'] ?? ''),
             'updated_at' => current_time('mysql'),
@@ -385,6 +389,7 @@ final class RequestRepository
             'general_notes' => '',
             'school_needs' => '',
             'school_schedule_notes' => '',
+            'natural_water_location' => '',
             'event_child_age_range' => '',
             'occasion_description' => '',
             'indoor_room_description' => '',

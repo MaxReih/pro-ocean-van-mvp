@@ -47,6 +47,7 @@ final class RequestController
         'school_grade' => 40,
         'school_needs' => 5000,
         'school_schedule_notes' => 5000,
+        'school_lesson_duration' => 16,
         'event_child_age_range' => 120,
         'occasion_description' => 5000,
         'availability_window' => 32,
@@ -56,6 +57,7 @@ final class RequestController
         'indoor_room_description' => 5000,
         'outdoor_area_description' => 5000,
         'electricity_outdoor_location' => 500,
+        'natural_water_location' => 500,
         'presentation_equipment_other' => 500,
         'laptop_connection_other' => 500,
         'accessibility_notes' => 5000,
@@ -152,7 +154,7 @@ final class RequestController
             return 'Bitte wähle eine Veranstaltungsart.';
         }
         if ($institutionType === 'Schule') {
-            $grades = ['preschool', 'grade_1', 'grade_2', 'grade_3', 'grade_4', 'grade_5', 'grade_6', 'grade_7', 'grade_8', 'grade_9', 'grade_10', 'grade_11', 'grade_12', 'grade_13', 'vocational', 'mixed'];
+            $grades = $this->publicSchoolGrades();
             $classCount = filter_var($payload['school_class_count'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 50]]);
             $teachersPerClass = filter_var($payload['school_teachers_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 20]]);
             $childrenPerClass = filter_var($payload['school_children_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
@@ -161,6 +163,9 @@ final class RequestController
             }
             if ($children !== $classCount * $childrenPerClass) {
                 return 'Bitte prüfe die Teilnehmenden- und Lehrpersonalzahlen.';
+            }
+            if (! in_array((string) ($payload['school_lesson_duration'] ?? ''), ['45', '60', '90'], true)) {
+                return 'Bitte wähle die Dauer einer Unterrichtseinheit.';
             }
         }
         if ($institutionType === 'Veranstaltung' && $children > 0 && trim((string) ($payload['event_child_age_range'] ?? '')) === '') {
@@ -215,7 +220,7 @@ final class RequestController
             if (! is_array($submittedWeekdays) || array_filter($submittedWeekdays, static fn (mixed $weekday): bool => ! is_string($weekday))) {
                 return 'Bitte prüfe die möglichen Wochentage.';
             }
-            $weekdays = array_values(array_intersect($submittedWeekdays, ['mon', 'tue', 'wed', 'thu', 'fri']));
+            $weekdays = array_values(array_intersect($submittedWeekdays, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']));
             if (! $weekdays) {
                 return 'Bitte wähle mindestens einen möglichen Wochentag.';
             }
@@ -281,7 +286,7 @@ final class RequestController
         }
         foreach ([
             'presentation_equipment' => ['chalkboard', 'projector', 'digital_display', 'other'],
-            'laptop_connections' => ['usb_c', 'usb_a', 'other'],
+            'laptop_connections' => ['usb_c', 'usb_a', 'hdmi', 'other'],
         ] as $field => $allowed) {
             $values = $payload[$field] ?? [];
             if (! is_array($values) || array_diff($values, $allowed)) {
@@ -296,6 +301,10 @@ final class RequestController
             && trim((string) ($payload['laptop_connection_other'] ?? '')) === '') {
             return 'Bitte beschreibe den sonstigen Laptop-Anschluss.';
         }
+        $naturalWaterLocation = trim((string) ($payload['natural_water_location'] ?? ''));
+        if ($naturalWaterLocation !== '' && ! $this->isGoogleMapsUrl($naturalWaterLocation)) {
+            return 'Bitte prüfe den Google-Maps-Link zu Fluss oder See.';
+        }
 
         return '';
     }
@@ -306,6 +315,18 @@ final class RequestController
             return false;
         }
         return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
+    }
+
+    private function publicSchoolGrades(): array
+    {
+        $configured = array_filter(array_map('trim', explode(',', (string) get_option('pov_school_grade_options', '3,4'))));
+        $grades = [];
+        foreach ($configured as $grade) {
+            if (ctype_digit($grade) && (int) $grade >= 1 && (int) $grade <= 13) {
+                $grades[] = 'grade_' . (int) $grade;
+            }
+        }
+        return $grades ?: ['grade_3', 'grade_4'];
     }
 
     private function textLength(string $value): int

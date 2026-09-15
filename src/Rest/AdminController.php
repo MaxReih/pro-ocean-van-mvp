@@ -205,6 +205,8 @@ final class AdminController
             'presentation_equipment' => (string) ($item['presentation_equipment'] ?? ''),
             'presentation_equipment_other' => (string) ($item['presentation_equipment_other'] ?? ''),
             'laptop_connections' => (string) ($item['laptop_connections'] ?? ''),
+            'school_lesson_duration' => (string) ($item['school_lesson_duration'] ?? ''),
+            'natural_water_location' => (string) ($item['natural_water_location'] ?? ''),
             'laptop_connection_other' => (string) ($item['laptop_connection_other'] ?? ''),
             'wifi_available' => (string) ($item['wifi_available'] ?? ''),
             'accessibility_notes' => (string) ($item['accessibility_notes'] ?? ''),

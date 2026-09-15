@@ -90,7 +90,7 @@ final class MailService
         array $attachmentIds = []
     ): bool
     {
-        if (! in_array($type, ['accept', 'question', 'reject', 'message'], true) || ! is_email((string) ($request['contact_email'] ?? ''))) {
+        if (! in_array($type, ['accept', 'question', 'reject', 'teacher', 'parents', 'followup', 'message'], true) || ! is_email((string) ($request['contact_email'] ?? ''))) {
             return false;
         }
 
@@ -100,6 +100,9 @@ final class MailService
             'question' => 'Rückfrage zu deiner Ocean-Van-Anfrage',
             'reject' => 'Deine Ocean-Van-Anfrage',
             'message' => 'Nachricht zu deiner Ocean-Van-Anfrage',
+            'teacher' => 'Informationen für Lehrkräfte zum Ocean Van',
+            'parents' => 'Informationen für Eltern zum Ocean Van',
+            'followup' => 'Ocean Van · Nachbereitung und Feedback',
         ];
         $lines = [
             'Hallo ' . (string) $request['contact_first_name'] . ',',
@@ -117,7 +120,7 @@ final class MailService
 
         $subject = trim($subject) !== '' ? sanitize_text_field($subject) : $subjects[$type];
         $body = implode("\n", $lines);
-        if (in_array($type, ['accept', 'question', 'reject'], true)) {
+        if (in_array($type, ['accept', 'question', 'reject', 'teacher', 'parents', 'followup'], true)) {
             $attachmentIds = array_values(array_unique(array_merge(
                 (new AttachmentService())->optionIds('pov_' . $type . '_attachment_ids'),
                 array_map('absint', $attachmentIds)

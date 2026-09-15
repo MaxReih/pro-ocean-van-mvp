@@ -121,6 +121,9 @@ final class AttachmentService
             'pov_accept_attachment_ids',
             'pov_question_attachment_ids',
             'pov_reject_attachment_ids',
+            'pov_teacher_attachment_ids',
+            'pov_parents_attachment_ids',
+            'pov_followup_attachment_ids',
         ] as $option) {
             $ids = array_merge($ids, $this->optionIds($option));
         }
@@ -234,6 +237,9 @@ final class AttachmentService
             'pov_accept_attachment_ids',
             'pov_question_attachment_ids',
             'pov_reject_attachment_ids',
+            'pov_teacher_attachment_ids',
+            'pov_parents_attachment_ids',
+            'pov_followup_attachment_ids',
         ] as $option) {
             $protected = array_merge($protected, $this->optionIds($option));
         }
@@ -387,6 +393,9 @@ final class AttachmentService
             'pov_accept_attachment_ids',
             'pov_question_attachment_ids',
             'pov_reject_attachment_ids',
+            'pov_teacher_attachment_ids',
+            'pov_parents_attachment_ids',
+            'pov_followup_attachment_ids',
         ] as $option) {
             $used = array_merge($used, $this->optionIds($option));
         }

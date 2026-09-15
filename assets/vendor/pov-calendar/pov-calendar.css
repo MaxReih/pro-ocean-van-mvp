@@ -67,6 +67,11 @@
 .pov-day[data-state="unavailable"] {
   background: #f7d3cf;
   color: #661b16;
+  opacity: 1;
+}
+
+.pov-day[data-state="limited"][data-requestable="true"] {
+  cursor: pointer;
 }
 
 .pov-day[data-state="past"] {

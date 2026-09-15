@@ -153,6 +153,13 @@ final class CalendarDayRepository
         )), [CalendarState::UNAVAILABLE, CalendarState::WALK_IN], true);
     }
 
+    public function find(int $id): ?array
+    {
+        global $wpdb;
+        $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}pov_calendar_days WHERE id = %d", $id), ARRAY_A);
+        return $row ?: null;
+    }
+
     private function validDate(string $date): bool
     {
         if (! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts)) {

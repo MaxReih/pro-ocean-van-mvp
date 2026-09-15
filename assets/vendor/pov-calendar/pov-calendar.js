@@ -80,8 +80,9 @@
         button.dataset.date = date;
         button.dataset.state = row.public_state;
         button.dataset.weekend = row.is_weekend ? 'true' : 'false';
+        button.dataset.requestable = row.is_requestable ? 'true' : 'false';
         button.dataset.recommended = this.recommended.has(date) ? 'true' : 'false';
-        button.disabled = !row.is_selectable && !row.is_interactive;
+        button.disabled = !row.is_selectable && !row.is_interactive && !row.is_requestable;
         const readableDate = new Intl.DateTimeFormat('de-DE', {
           weekday: 'long',
           day: 'numeric',
@@ -95,6 +96,10 @@
         button.addEventListener('click', () => {
           if (row.is_interactive && this.options.onDetails) {
             this.options.onDetails(date, row);
+            return;
+          }
+          if (row.is_requestable && this.options.onRequest) {
+            this.options.onRequest(date, row);
             return;
           }
           if (row.is_selectable && this.options.onSelect) this.options.onSelect(date, row);

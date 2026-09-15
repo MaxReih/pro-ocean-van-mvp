@@ -154,6 +154,16 @@
   document.querySelectorAll('[data-pov-calendar-form]').forEach(syncDateRange);
   document.querySelectorAll('[data-pov-response-form]').forEach(bindResponseForm);
   document.querySelectorAll('[data-pov-settings-form]').forEach(bindProviderSettings);
+  document.querySelectorAll('[data-pov-open-details]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const details = document.querySelector(button.dataset.povOpenDetails || '');
+      if (!details) return;
+      details.open = true;
+      details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const first = details.querySelector('input, select, textarea');
+      if (first) window.setTimeout(() => first.focus(), 350);
+    });
+  });
   bindCalendarExport();
   bindCalendarDays();
 })();

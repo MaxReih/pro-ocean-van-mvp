@@ -184,6 +184,9 @@
 .pov-request-hero p { margin: 0; font-size: 12px; }
 .pov-request-hero-meta { display: grid; grid-template-columns: repeat(3, minmax(100px, 1fr)); gap: 8px; }
 .pov-request-hero-meta > div { display: grid; gap: 3px; min-width: 118px; padding: 12px; background: rgba(255, 255, 255, .82); border: 1px solid rgba(18, 85, 121, .1); border-radius: 10px; }
+.pov-request-status.is-new, .pov-request-status.is-in_review, .pov-request-status.is-awaiting_response { border-left: 5px solid var(--pov-yellow); }
+.pov-request-status.is-accepted { border-left: 5px solid var(--pov-green); background: #edf8f2; }
+.pov-request-status.is-rejected, .pov-request-status.is-cancelled { border-left: 5px solid #b44339; background: #fcedeb; }
 .pov-request-hero-meta span { color: var(--pov-muted); font-size: 9px; text-transform: uppercase; }
 .pov-request-hero-meta strong { font-size: 15px; }
 .pov-admin-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
@@ -267,6 +270,10 @@
 .pov-admin-calendar-head { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-bottom: 13px; }
 .pov-admin-calendar-head h2 { text-align: center; text-transform: capitalize; }
 .pov-admin-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.pov-admin-calendar-cell { position: relative; min-width: 0; min-height: 104px; }
+.pov-admin-calendar-cell > .pov-admin-calendar-day { height: 100%; padding-bottom: 25px; }
+.pov-calendar-request-link { position: absolute; right: 7px; bottom: 6px; left: 7px; overflow: hidden; color: var(--pov-blue); font-size: 9px; font-weight: 800; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.pov-admin-calendar-day.is-confirmed + .pov-calendar-request-link { color: #fff; }
 .pov-admin-calendar-weekday { min-height: 26px; color: var(--pov-green); font-size: 10px; font-weight: 850; text-align: center; }
 .pov-admin-calendar-empty,
 .pov-admin-calendar-day { min-height: 104px; border-radius: 9px; }
@@ -300,6 +307,9 @@
 .pov-request-editor[open] > summary { margin-bottom: 12px; }
 .pov-communication-timeline { display: grid; gap: 10px; }
 .pov-communication-item { padding: 13px; background: #f7f9f9; border-left: 4px solid var(--pov-line); border-radius: 9px; }
+.pov-communication-item > summary { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; list-style-position: inside; }
+.pov-communication-item > summary time { flex: 0 0 auto; color: var(--pov-muted); font-size: 10px; }
+.pov-communication-body { padding-top: 12px; }
 .pov-communication-item.is-incoming { background: #eff8f3; border-left-color: var(--pov-green); }
 .pov-communication-item.is-outgoing { background: var(--pov-blue-soft); border-left-color: var(--pov-blue); }
 .pov-communication-item.is-system { background: #f4f1f8; border-left-color: #7d6795; }
