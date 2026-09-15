@@ -6,7 +6,7 @@ namespace ProOceanVan\Database;
 
 final class Schema
 {
-    public const VERSION = '2026.09.15.1';
+    public const VERSION = '2026.09.15.2';
 
     /**
      * @return string[]
@@ -127,6 +127,7 @@ final class Schema
                 public_location VARCHAR(255) NULL,
                 public_url VARCHAR(500) NULL,
                 public_event_group VARCHAR(64) NULL,
+                request_id BIGINT UNSIGNED NULL,
                 participants_children INT UNSIGNED NULL,
                 participants_adults INT UNSIGNED NULL,
                 metrics_recorded_at DATETIME NULL,
@@ -138,7 +139,8 @@ final class Schema
                 PRIMARY KEY  (id),
                 UNIQUE KEY calendar_date (calendar_date),
                 KEY availability_state (availability_state),
-                KEY public_event_group (public_event_group)
+                KEY public_event_group (public_event_group),
+                KEY request_id (request_id)
             ) {$charset};",
             "CREATE TABLE {$prefix}pov_appointments (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

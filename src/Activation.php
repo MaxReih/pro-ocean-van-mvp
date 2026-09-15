@@ -245,6 +245,7 @@ final class Activation
             'pov_response_parents_template' => "hier kommen die Informationen für Eltern und Teilnehmende zur Vorbereitung des Ocean-Van-Einsatzes:",
             'pov_response_followup_template' => "vielen Dank für den gemeinsamen Ocean-Van-Einsatz. Wir freuen uns über euer Feedback:",
             'pov_school_grade_options' => '3,4',
+            'pov_state_windows' => [],
             'pov_confirmation_attachment_ids' => '',
             'pov_proposal_attachment_ids' => '',
             'pov_accept_attachment_ids' => '',

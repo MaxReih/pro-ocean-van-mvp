@@ -28,6 +28,7 @@ use ProOceanVan\Service\GermanDateFormatter;
 use ProOceanVan\Service\InternalSuggestionService;
 use ProOceanVan\Service\MailService;
 use ProOceanVan\Service\RequestRoutingService;
+use ProOceanVan\Service\SeasonalStateService;
 use ProOceanVan\Service\StatisticsService;
 use ProOceanVan\Service\WeeklyClusterService;
 
@@ -64,6 +65,8 @@ final class Menu
         add_action('admin_post_pov_update_workflow', [$this, 'updateWorkflow']);
         add_action('admin_post_pov_download_ics', [$this, 'downloadIcs']);
         add_action('admin_post_pov_create_manual_appointment', [$this, 'createManualAppointment']);
+        add_action('admin_post_pov_add_state_window', [$this, 'addStateWindow']);
+        add_action('admin_post_pov_delete_state_window', [$this, 'deleteStateWindow']);
     }
 
     public function menus(): void
@@ -217,6 +220,18 @@ final class Menu
             $monthStart->format('Y-m-d'),
             $monthEnd->format('Y-m-d')
         ));
+        $publicEvents = array_values(array_filter(
+            (new CalendarDayRepository())->forRange($monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')),
+            static fn (array $row): bool => (string) ($row['availability_state'] ?? '') === 'walk_in'
+        ));
+        $publicRequestIds = array_values(array_filter(array_map(
+            static fn (array $event): int => (int) ($event['request_id'] ?? 0),
+            $publicEvents
+        )));
+        $exportAppointments = array_values(array_filter(
+            $appointments,
+            static fn (array $appointment): bool => ! in_array((int) ($appointment['request_id'] ?? 0), $publicRequestIds, true)
+        ));
 
         $this->header('Kalender');
         $this->setupNotice();
@@ -233,10 +248,7 @@ final class Menu
         if (current_user_can(Capabilities::EXPORT_CALENDAR) || current_user_can(Capabilities::MANAGE_CALENDAR)) {
             echo '<section class="pov-admin-panel pov-calendar-sidebar">';
             if (current_user_can(Capabilities::EXPORT_CALENDAR)) {
-                echo $this->calendarExportPanel($appointments, array_values(array_filter(
-                    (new CalendarDayRepository())->forRange($monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')),
-                    static fn (array $row): bool => (string) ($row['availability_state'] ?? '') === 'walk_in'
-                )));
+                echo $this->calendarExportPanel($exportAppointments, $publicEvents);
             }
             if (current_user_can(Capabilities::MANAGE_CALENDAR)) {
                 if (current_user_can(Capabilities::EXPORT_CALENDAR)) {
@@ -248,7 +260,11 @@ final class Menu
                 }
                 echo '<details class="pov-manual-appointment"><summary>Termin manuell anlegen</summary><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
                 wp_nonce_field('pov_create_manual_appointment');
-                echo '<input type="hidden" name="action" value="pov_create_manual_appointment"><label>Datum <input type="date" name="appointment_date" min="' . esc_attr(current_time('Y-m-d')) . '" required></label><label>Einrichtung / Veranstaltung <input name="institution_name" required></label><label>Veranstaltungsart <select name="institution_type">' . $this->options(['Schule' => 'Schule', 'Veranstaltung' => 'Veranstaltung', 'Sonstiges' => 'Sonstiges'], 'Veranstaltung') . '</select></label><div class="pov-admin-two"><label>PLZ <input name="postal_code" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required></label><label>Ort <input name="city" required></label></div><label>Bundesland <select name="state_code" required>' . $this->options($stateOptions, '') . '</select></label><div class="pov-admin-two"><label>Straße <input name="street"></label><label>Hausnummer <input name="house_number"></label></div><div class="pov-admin-two"><label>Kinder <input type="number" min="0" name="children_count" value="0"></label><label>Erwachsene <input type="number" min="0" name="adult_count" value="1"></label></div><label>Kontakt-E-Mail <input type="email" name="contact_email"></label><button class="button button-primary">Termin anlegen</button></form></details><div class="pov-calendar-sidebar-divider" aria-hidden="true"></div>';
+                echo '<input type="hidden" name="action" value="pov_create_manual_appointment"><label>Sichtbarkeit <select name="manual_visibility"><option value="internal">Interner Tourstopp</option><option value="public">Öffentliches Event</option></select></label><label>Datum <input type="date" name="appointment_date" min="' . esc_attr(current_time('Y-m-d')) . '" required></label><label>Einrichtung / Veranstaltung <input name="institution_name" required></label><label>Veranstaltungsart <select name="institution_type">' . $this->options(['Schule' => 'Schule', 'Veranstaltung' => 'Veranstaltung', 'Sonstiges' => 'Sonstiges'], 'Veranstaltung') . '</select></label>';
+                echo '<div class="pov-admin-two"><label>PLZ <input name="postal_code" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required></label><label>Ort <input name="city" required></label></div><label>Bundesland <select name="state_code" required>' . $this->options($stateOptions, '') . '</select></label><div class="pov-admin-two"><label>Straße <input name="street" required></label><label>Hausnummer <input name="house_number" required></label></div>';
+                echo '<fieldset><legend>Kontakt</legend><div class="pov-admin-two"><label>Vorname <input name="contact_first_name"></label><label>Nachname <input name="contact_last_name"></label><label>Funktion <input name="contact_role"></label><label>Telefon <input name="contact_phone"></label></div><label>E-Mail <input type="email" name="contact_email"></label></fieldset>';
+                echo '<fieldset><legend>Planungsgrundlagen</legend><div class="pov-admin-two"><label>Kinder <input type="number" min="0" name="children_count" value="0"></label><label>Erwachsene <input type="number" min="0" name="adult_count" value="1"></label><label>Einsatzbereich <select name="venue_type"><option value="">Noch offen</option><option value="indoor">Innenraum</option><option value="outdoor">Außenbereich</option><option value="both">Innen- und Außenbereich</option></select></label><label>Stellplatz <select name="parking_type"><option value="other">Noch zu klären</option><option value="schoolyard">Schulhof</option><option value="parking_lot">Parkplatz</option><option value="street">Straßenrand / Ladezone</option></select></label></div><label>Interne Hinweise <textarea name="general_notes"></textarea></label></fieldset>';
+                echo '<div data-pov-manual-public hidden><label>Öffentliche Beschreibung <textarea name="public_description"></textarea></label><label>Öffentlicher Link <input type="url" name="public_url"></label></div><button class="button button-primary">Termin anlegen</button></form></details><div class="pov-calendar-sidebar-divider" aria-hidden="true"></div>';
                 echo '<h2>Zeitraum pflegen</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form" data-pov-calendar-form>';
                 wp_nonce_field('pov_save_calendar_day');
                 echo '<input type="hidden" name="action" value="pov_save_calendar_day">';
@@ -273,6 +289,9 @@ final class Menu
             echo '</section>';
         }
         echo '</div>';
+        if (current_user_can(Capabilities::MANAGE_CALENDAR)) {
+            echo $this->seasonalStatePanel();
+        }
         $this->footer();
     }
 
@@ -1201,7 +1220,10 @@ final class Menu
         $city = sanitize_text_field((string) ($_POST['city'] ?? ''));
         $children = max(0, (int) ($_POST['children_count'] ?? 0));
         $adults = max(0, (int) ($_POST['adult_count'] ?? 0));
-        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $date < current_time('Y-m-d') || ! preg_match('/^\d{5}$/', $postalCode) || $institution === '' || $city === '' || ($children + $adults) < 1 || (new AppointmentRepository())->existsOnDate($date)) {
+        $street = sanitize_text_field((string) ($_POST['street'] ?? ''));
+        $houseNumber = sanitize_text_field((string) ($_POST['house_number'] ?? ''));
+        $visibility = sanitize_key((string) ($_POST['manual_visibility'] ?? 'internal'));
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $date < current_time('Y-m-d') || ! preg_match('/^\d{5}$/', $postalCode) || $institution === '' || $city === '' || $street === '' || $houseNumber === '' || ($children + $adults) < 1 || ! in_array($visibility, ['internal', 'public'], true) || (new AppointmentRepository())->existsOnDate($date) || (new CalendarDayRepository())->isBlocked($date)) {
             $this->redirect('pov-calendar', ['pov_notice' => 'manual-invalid']);
         }
         $payload = [
@@ -1209,12 +1231,13 @@ final class Menu
             'specific_requested_date' => $date,
             'institution_name' => $institution,
             'institution_type' => sanitize_text_field((string) ($_POST['institution_type'] ?? 'Veranstaltung')),
-            'contact_first_name' => 'Team',
-            'contact_last_name' => 'Pro Ocean',
+            'contact_first_name' => sanitize_text_field((string) ($_POST['contact_first_name'] ?? '')),
+            'contact_last_name' => sanitize_text_field((string) ($_POST['contact_last_name'] ?? '')),
+            'contact_role' => sanitize_text_field((string) ($_POST['contact_role'] ?? '')),
             'contact_email' => sanitize_email((string) ($_POST['contact_email'] ?? '')),
-            'contact_phone' => '',
-            'street' => sanitize_text_field((string) ($_POST['street'] ?? '')),
-            'house_number' => sanitize_text_field((string) ($_POST['house_number'] ?? '')),
+            'contact_phone' => sanitize_text_field((string) ($_POST['contact_phone'] ?? '')),
+            'street' => $street,
+            'house_number' => $houseNumber,
             'postal_code' => $postalCode,
             'city' => $city,
             'state_code' => sanitize_key((string) ($_POST['state_code'] ?? '')),
@@ -1222,15 +1245,29 @@ final class Menu
             'adult_count' => $adults,
             'participant_total' => $children + $adults,
             'privacy_consent' => 0,
-            'parking_type' => 'other',
+            'venue_type' => sanitize_key((string) ($_POST['venue_type'] ?? '')),
+            'parking_type' => sanitize_key((string) ($_POST['parking_type'] ?? 'other')),
+            'general_notes' => sanitize_textarea_field((string) wp_unslash($_POST['general_notes'] ?? '')),
             'classes' => [['class_name' => 'Manuell angelegter Termin', 'grade' => 1, 'participant_count' => max(1, $children + $adults)]],
         ];
         $payload = (new RequestRoutingService())->enrich($payload);
         $requests = new RequestRepository();
         $requestId = $requests->create($payload);
         $request = $requests->find($requestId);
-        if (! $request || (new AppointmentRepository())->createFromRequest($request, $date, $city) <= 0) {
+        $appointments = new AppointmentRepository();
+        if (! $request || $appointments->createFromRequest($request, $date, $city) <= 0) {
             $this->redirect('pov-calendar', ['pov_notice' => 'manual-invalid']);
+        }
+        if ($visibility === 'public') {
+            (new CalendarDayRepository())->upsert($date, 'walk_in', '', (string) ($payload['general_notes'] ?? ''), [], [
+                'title' => $institution,
+                'description' => sanitize_textarea_field((string) wp_unslash($_POST['public_description'] ?? '')),
+                'location' => trim($street . ' ' . $houseNumber . ', ' . $postalCode . ' ' . $city),
+                'url' => esc_url_raw((string) ($_POST['public_url'] ?? '')),
+                'participants_children' => $children,
+                'participants_adults' => $adults,
+                'request_id' => $requestId,
+            ]);
         }
         $requests->updateStatus($requestId, RequestStatus::CONFIRMED, WorkState::ACCEPTED, ['confirmed_at' => current_time('mysql')]);
         (new CommunicationRepository())->record($requestId, [
@@ -1244,6 +1281,24 @@ final class Menu
         $this->redirect('pov-calendar', ['pov_notice' => 'manual-created', 'pov_month' => substr($date, 0, 7)]);
     }
 
+    public function addStateWindow(): void
+    {
+        $this->guard('pov_add_state_window', Capabilities::MANAGE_CALENDAR);
+        $saved = (new SeasonalStateService())->add(
+            sanitize_text_field((string) ($_POST['date_from'] ?? '')),
+            sanitize_text_field((string) ($_POST['date_to'] ?? '')),
+            (array) ($_POST['state_codes'] ?? [])
+        );
+        $this->redirect('pov-calendar', ['pov_notice' => $saved ? 'state-window-saved' : 'state-window-invalid']);
+    }
+
+    public function deleteStateWindow(): void
+    {
+        $this->guard('pov_delete_state_window', Capabilities::MANAGE_CALENDAR);
+        (new SeasonalStateService())->delete(sanitize_text_field((string) ($_POST['window_id'] ?? '')));
+        $this->redirect('pov-calendar', ['pov_notice' => 'state-window-deleted']);
+    }
+
     public function downloadIcs(): void
     {
         $this->guard('pov_download_ics', Capabilities::EXPORT_CALENDAR);
@@ -1255,7 +1310,8 @@ final class Menu
             }
             header('Content-Type: text/calendar; charset=utf-8');
             header('Content-Disposition: attachment; filename="ocean-van-event-' . sanitize_file_name((string) $event['calendar_date']) . '.ics"');
-            echo (new IcsService())->publicEvent($event);
+            $request = ! empty($event['request_id']) ? (new RequestRepository())->find((int) $event['request_id']) : [];
+            echo (new IcsService())->publicEvent($event, $request ?: []);
             exit;
         }
         $appointment = (new AppointmentRepository())->find((int) ($_GET['appointment_id'] ?? 0));
@@ -1455,12 +1511,40 @@ final class Menu
         if ($publicEvents) {
             $html .= '<div class="pov-public-event-exports"><h3>Öffentliche Events</h3>';
             foreach ($publicEvents as $event) {
+                $request = ! empty($event['request_id']) ? $requestRepository->find((int) $event['request_id']) : [];
                 $ics = wp_nonce_url(admin_url('admin-post.php?action=pov_download_ics&calendar_day_id=' . (int) $event['id']), 'pov_download_ics');
-                $html .= '<div><span>' . esc_html(mysql2date('d.m.Y', (string) $event['calendar_date']) . ' · ' . (string) ($event['public_title'] ?: 'Öffentliches Event')) . '</span><a class="button" target="_blank" rel="noopener" href="' . esc_url($icsService->googlePublicEventLink($event)) . '">Google</a><a class="button" href="' . esc_url($ics) . '">ICS</a></div>';
+                $html .= '<div><span>' . esc_html(mysql2date('d.m.Y', (string) $event['calendar_date']) . ' · ' . (string) ($event['public_title'] ?: 'Öffentliches Event')) . '</span><a class="button" target="_blank" rel="noopener" href="' . esc_url($icsService->googlePublicEventLink($event, $request ?: [])) . '">Google</a><a class="button" href="' . esc_url($ics) . '">ICS</a></div>';
             }
             $html .= '</div>';
         }
         return $html . '</div>';
+    }
+
+    private function seasonalStatePanel(): string
+    {
+        $states = (new StateRepository())->all();
+        $stateLabels = array_column($states, 'state_name', 'state_code');
+        $windows = (new SeasonalStateService())->all();
+        ob_start();
+        echo '<section class="pov-admin-panel pov-state-windows"><div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Tourregionen</span><h2>Saisonale Bundesländer</h2></div></div><p>Innerhalb eines Zeitraums sind nur die ausgewählten Bundesländer anfragbar. Außerhalb gelten die global aktiven Bundesländer.</p>';
+        if ($windows) {
+            echo '<div class="pov-state-window-list">';
+            foreach ($windows as $window) {
+                $labels = array_map(static fn (string $code): string => (string) ($stateLabels[$code] ?? $code), (array) ($window['states'] ?? []));
+                echo '<article><div><strong>' . esc_html(GermanDateFormatter::short((string) $window['from']) . ' – ' . GermanDateFormatter::short((string) $window['to'])) . '</strong><span>' . esc_html(implode(', ', $labels)) . '</span></div><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+                wp_nonce_field('pov_delete_state_window');
+                echo '<input type="hidden" name="action" value="pov_delete_state_window"><input type="hidden" name="window_id" value="' . esc_attr((string) $window['id']) . '"><button class="button button-link-delete">Entfernen</button></form></article>';
+            }
+            echo '</div>';
+        }
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form pov-state-window-form">';
+        wp_nonce_field('pov_add_state_window');
+        echo '<input type="hidden" name="action" value="pov_add_state_window"><div class="pov-admin-two"><label>Von <input type="date" name="date_from" required></label><label>Bis <input type="date" name="date_to" required></label></div><fieldset><legend>Freigegebene Bundesländer</legend><div class="pov-state-checkboxes">';
+        foreach ($states as $state) {
+            echo '<label><input type="checkbox" name="state_codes[]" value="' . esc_attr((string) $state['state_code']) . '"> ' . esc_html((string) $state['state_name']) . '</label>';
+        }
+        echo '</div></fieldset><button class="button button-primary">Tourregion speichern</button></form></section>';
+        return (string) ob_get_clean();
     }
 
     private function suggestionTable(array $suggestions): void
@@ -2241,6 +2325,9 @@ final class Menu
             'calendar-invalid' => ['error', 'Bitte einen gültigen Zeitraum mit höchstens 366 Tagen wählen.'],
             'manual-created' => ['success', 'Termin angelegt und im Kalender eingetragen.'],
             'manual-invalid' => ['error', 'Termin konnte nicht angelegt werden. Bitte Datum, Ort und Belegung prüfen.'],
+            'state-window-saved' => ['success', 'Saisonale Bundesländer gespeichert.'],
+            'state-window-deleted' => ['success', 'Saisonale Freigabe entfernt.'],
+            'state-window-invalid' => ['error', 'Bitte Zeitraum und mindestens ein Bundesland wählen.'],
             'address-geocoded' => ['success', 'Adresse gespeichert. Geoanalyse und Fahrstrecke wurden aktualisiert.'],
             'address-no-route' => ['warning', 'Adresse gespeichert und gefunden. Die Fahrstrecke ist noch offen.'],
             'address-unverified' => ['error', 'Adresse gespeichert, aber nicht gefunden. Angaben korrigieren oder Geoanalyse prüfen.'],

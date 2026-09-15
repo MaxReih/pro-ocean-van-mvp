@@ -47,7 +47,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <div class="pov-subheading">
                     <div>
                         <strong id="pov-recommendation-title" class="pov-section-title">Unsere Terminvorschläge</strong>
-                        <span class="pov-section-note">Routenoptimiert und mindestens zwei Wochen im Voraus.</span>
+                        <span class="pov-section-note">Diese Termine können wir euch für euren Einsatzort besonders gut anbieten.</span>
                     </div>
                 </div>
                 <div class="pov-suggestions" data-role="suggestions" aria-live="polite" aria-busy="false">
@@ -58,7 +58,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </div>
             </section>
 
-            <p class="pov-recommendation-help">Kein passender Termin? Kalender oder Wunschzeitraum nutzen.</p>
+            <p class="pov-recommendation-help">Kein passender Termin dabei? Schaut euch weitere verfügbare Termine an oder gebt uns euren Wunschzeitraum an.</p>
 
             <section class="pov-option-panel" id="pov-calendar-panel" data-role="calendar-panel" aria-labelledby="pov-calendar-title">
                 <div class="pov-calendar-toolbar">
@@ -68,6 +68,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </div>
                 <div class="pov-live pov-calendar-status" role="status" aria-live="polite" data-role="calendar-status"></div>
                 <div class="pov-calendar" data-role="calendar" role="group" aria-label="Verfügbare Besuchstage" aria-busy="false"></div>
+                <p class="pov-calendar-hint">Der Kalender zeigt einzelne Besuchstage. Für mehrere mögliche Tage nutzt bitte den Wunschzeitraum.</p>
                 <div class="pov-legend" aria-label="Kalenderlegende">
                     <span><i class="is-available"></i>Verfügbar</span>
                     <span><i class="is-limited"></i>Auf Anfrage</span>
@@ -78,7 +79,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
             </section>
 
             <section class="pov-option-panel pov-range-panel" id="pov-range-panel" data-role="range-panel" aria-labelledby="pov-range-title">
-                <h3 id="pov-range-title" tabindex="-1">Euer Wunschzeitraum</h3>
+                <h3 id="pov-range-title" tabindex="-1">Wunschzeitraum anfragen</h3>
                 <div class="pov-grid-2">
                     <label>Frühester Termin
                         <input type="date" data-range-field="from">

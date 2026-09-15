@@ -469,8 +469,14 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-suggestion.is-best {
-  background: linear-gradient(135deg, rgba(245, 219, 162, .45), var(--pov-white));
-  border-color: var(--pov-sand);
+  background: linear-gradient(135deg, rgba(220, 241, 235, .7), var(--pov-white));
+  border-color: #9ecdb2;
+}
+
+.pov-calendar-hint {
+  margin: 12px 0 0;
+  color: var(--pov-muted);
+  font-size: .88rem;
 }
 
 .pov-suggestion.is-week {

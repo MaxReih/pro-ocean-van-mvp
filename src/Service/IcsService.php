@@ -6,10 +6,19 @@ namespace ProOceanVan\Service;
 
 final class IcsService
 {
-    public function publicEvent(array $event): string
+    public function publicEvent(array $event, array $request = []): string
     {
         $date = (string) ($event['calendar_date'] ?? '');
         $compactDate = str_replace('-', '', $date);
+        $contact = $this->contact([], $request);
+        $description = implode("\n", array_filter([
+            (string) ($event['public_description'] ?? ''),
+            (string) ($event['public_url'] ?? ''),
+            $contact['name'] !== '' ? 'Kontakt: ' . $contact['name'] : '',
+            $contact['phone'] !== '' ? 'Telefon: ' . $contact['phone'] : '',
+            $contact['email'] !== '' ? 'E-Mail: ' . $contact['email'] : '',
+            ! empty($request['public_uuid']) ? 'Anfrage: ' . (string) $request['public_uuid'] : '',
+        ]));
         return implode("\r\n", [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
@@ -22,22 +31,32 @@ final class IcsService
             'DTEND;VALUE=DATE:' . date('Ymd', strtotime($date . ' +1 day')),
             'SUMMARY:' . $this->escape('Ocean Van - ' . (string) ($event['public_title'] ?? 'Öffentliches Event')),
             'LOCATION:' . $this->escape((string) ($event['public_location'] ?? '')),
-            'DESCRIPTION:' . $this->escape(trim((string) ($event['public_description'] ?? '') . "\n" . (string) ($event['public_url'] ?? ''))),
+            $contact['email'] !== '' ? 'ORGANIZER;CN=' . $this->escape($contact['name'] ?: 'Kontakt') . ':MAILTO:' . $this->escape($contact['email']) : '',
+            'DESCRIPTION:' . $this->escape($description),
             'END:VEVENT',
             'END:VCALENDAR',
             '',
-        ]);
+        ], static fn (string $line): bool => $line !== '');
     }
 
-    public function googlePublicEventLink(array $event): string
+    public function googlePublicEventLink(array $event, array $request = []): string
     {
         $date = (string) ($event['calendar_date'] ?? '');
+        $contact = $this->contact([], $request);
+        $details = implode("\n", array_filter([
+            (string) ($event['public_description'] ?? ''),
+            (string) ($event['public_url'] ?? ''),
+            $contact['name'] !== '' ? 'Kontakt: ' . $contact['name'] : '',
+            $contact['phone'] !== '' ? 'Telefon: ' . $contact['phone'] : '',
+            $contact['email'] !== '' ? 'E-Mail: ' . $contact['email'] : '',
+            ! empty($request['public_uuid']) ? 'Anfrage: ' . (string) $request['public_uuid'] : '',
+        ]));
         return add_query_arg([
             'action' => 'TEMPLATE',
             'text' => 'Ocean Van - ' . (string) ($event['public_title'] ?? 'Öffentliches Event'),
             'dates' => str_replace('-', '', $date) . '/' . date('Ymd', strtotime($date . ' +1 day')),
             'location' => (string) ($event['public_location'] ?? ''),
-            'details' => trim((string) ($event['public_description'] ?? '') . "\n" . (string) ($event['public_url'] ?? '')),
+            'details' => $details,
         ], 'https://calendar.google.com/calendar/render');
     }
 

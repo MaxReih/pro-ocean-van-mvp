@@ -274,6 +274,15 @@
 .pov-admin-calendar-cell > .pov-admin-calendar-day { height: 100%; padding-bottom: 25px; }
 .pov-calendar-request-link { position: absolute; right: 7px; bottom: 6px; left: 7px; overflow: hidden; color: var(--pov-blue); font-size: 9px; font-weight: 800; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .pov-admin-calendar-day.is-confirmed + .pov-calendar-request-link { color: #fff; }
+.pov-state-windows { margin-top: 16px; }
+.pov-state-windows > p { color: var(--pov-muted); }
+.pov-state-window-list { display: grid; gap: 8px; margin: 16px 0; }
+.pov-state-window-list article { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: var(--pov-blue-soft); border-radius: 9px; }
+.pov-state-window-list article > div { display: grid; gap: 3px; }
+.pov-state-window-form { max-width: 760px; }
+.pov-state-checkboxes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px 12px; }
+.pov-public-event-exports { display: grid; gap: 8px; margin-top: 18px; }
+.pov-public-event-exports > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
 .pov-admin-calendar-weekday { min-height: 26px; color: var(--pov-green); font-size: 10px; font-weight: 850; text-align: center; }
 .pov-admin-calendar-empty,
 .pov-admin-calendar-day { min-height: 104px; border-radius: 9px; }

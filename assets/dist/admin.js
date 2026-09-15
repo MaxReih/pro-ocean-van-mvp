@@ -132,6 +132,15 @@
     update();
   }
 
+  function bindManualAppointment(form) {
+    const visibility = form.querySelector('[name="manual_visibility"]');
+    const publicFields = form.querySelector('[data-pov-manual-public]');
+    if (!visibility || !publicFields) return;
+    const update = () => { publicFields.hidden = visibility.value !== 'public'; };
+    visibility.addEventListener('change', update);
+    update();
+  }
+
   function bindProviderSettings(form) {
     const routing = form.querySelector('[data-pov-provider-select="routing"]');
     const geocoding = form.querySelector('[data-pov-provider-select="geocoding"]');
@@ -154,6 +163,7 @@
   document.querySelectorAll('[data-pov-calendar-form]').forEach(syncDateRange);
   document.querySelectorAll('[data-pov-response-form]').forEach(bindResponseForm);
   document.querySelectorAll('[data-pov-settings-form]').forEach(bindProviderSettings);
+  document.querySelectorAll('.pov-manual-appointment form').forEach(bindManualAppointment);
   document.querySelectorAll('[data-pov-open-details]').forEach((button) => {
     button.addEventListener('click', () => {
       const details = document.querySelector(button.dataset.povOpenDetails || '');

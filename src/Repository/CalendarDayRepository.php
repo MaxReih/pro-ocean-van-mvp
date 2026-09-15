@@ -90,6 +90,11 @@ final class CalendarDayRepository
             'custom_start_longitude' => $start['longitude'] ?? null,
             'updated_at' => current_time('mysql'),
         ];
+        if ($state !== CalendarState::WALK_IN) {
+            $data['request_id'] = null;
+        } elseif (array_key_exists('request_id', $publicEvent)) {
+            $data['request_id'] = max(0, (int) $publicEvent['request_id']) ?: null;
+        }
 
         $exists = (int) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE calendar_date = %s", $date));
         if ($exists > 0) {

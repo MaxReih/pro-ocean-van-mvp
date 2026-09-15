@@ -12,6 +12,7 @@ use ProOceanVan\Repository\StateRepository;
 use ProOceanVan\Service\EligibilityTokenService;
 use ProOceanVan\Service\MailService;
 use ProOceanVan\Service\RequestRoutingService;
+use ProOceanVan\Service\SeasonalStateService;
 use ProOceanVan\Security\FrontendAccess;
 use WP_Error;
 use WP_REST_Request;
@@ -223,6 +224,9 @@ final class RequestController
             $weekdays = array_values(array_intersect($submittedWeekdays, ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']));
             if (! $weekdays) {
                 return 'Bitte wähle mindestens einen möglichen Wochentag.';
+            }
+            if (! (new SeasonalStateService())->rangeHasAllowedDay((string) ($payload['state_code'] ?? ''), $from, $to, $weekdays)) {
+                return 'In diesem Zeitraum ist das gewählte Bundesland nicht für Anfragen freigegeben.';
             }
         }
         if (empty($payload['classes']) || ! is_array($payload['classes'])) {

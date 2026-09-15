@@ -73,9 +73,13 @@ final class PublicRecommendationService
         );
         $suggestions = [];
         $comparisonCache = [];
+        $seasonalStates = new SeasonalStateService();
 
         foreach (new DatePeriod($start, new DateInterval('P1D'), $end) as $day) {
             $date = $day->format('Y-m-d');
+            if (! $seasonalStates->allows($stateCode, $date)) {
+                continue;
+            }
             if ((int) $day->format('N') >= 6) {
                 continue;
             }

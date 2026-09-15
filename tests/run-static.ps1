@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$root = Split-Path -Parent $PSScriptRoot
 $utf8 = [System.Text.Encoding]::UTF8
 
 function Read-Text($relative) {
@@ -116,7 +116,7 @@ Assert-Contains 'assets/dist/frontend.js' 'updateEventTypeSections' 'event-type 
 Assert-Contains 'templates/frontend-booking.php' 'name="contact_role"' 'frontend captures the requester role'
 Assert-Contains 'templates/frontend-booking.php' 'name="institution_website"' 'frontend captures the institution website'
 Assert-Contains 'templates/frontend-booking.php' 'name="availability_window"' 'frontend captures the planning time window with the detail questions'
-Assert-Contains 'templates/frontend-booking.php' 'Hinweise / Wünsche zur zeitlichen Planung' 'school bookings capture planning wishes'
+Assert-Contains 'templates/frontend-booking.php' 'name="school_schedule_notes"' 'school bookings capture planning wishes'
 Assert-Contains 'templates/frontend-booking.php' 'mindestens 1 Stunde' 'frontend explains required setup access'
 Assert-NotContains 'templates/frontend-booking.php' 'value="unknown"' 'public onsite questions offer clear yes-or-no choices'
 Assert-Contains 'templates/frontend-booking.php' 'Schulhof' 'van parking offers a schoolyard option'
@@ -340,6 +340,17 @@ Assert-Contains 'src/Routing/OsrmRoutingProvider.php' "'annotations' => 'distanc
 Assert-Contains 'src/Routing/OsrmRoutingProvider.php' 'coordinatePathPart' 'OSRM coordinates are formatted without encoded comma'
 Assert-NotContains 'src/Routing/OsrmRoutingProvider.php' 'rawurlencode' 'OSRM coordinate path does not encode commas'
 Assert-NotContains 'src/Routing/OsrmRoutingProvider.php' 'Matrix ist im MVP als austauschbarer Provider vorbereitet' 'matrix stub was removed'
+Assert-Contains 'templates/frontend-booking.php' 'besonders gut anbieten.</span>' 'recommended-date wording follows the team feedback'
+Assert-Contains 'templates/frontend-booking.php' 'einzelne Besuchstage.' 'calendar explains single-day selection and points to the range request'
+Assert-Contains 'templates/frontend-booking.php' '>Wunschzeitraum anfragen<' 'wish range remains clearly named and permanently visible'
+Assert-NotContains 'assets/dist/frontend.css' 'rgba(245, 219, 162, .45)' 'best route suggestion is no longer misleadingly yellow'
+Assert-Contains 'src/Admin/Menu.php' 'seasonalStatePanel()' 'calendar shows where seasonal state availability is configured'
+Assert-Contains 'src/Service/PublicRecommendationService.php' 'SeasonalStateService' 'public recommendations honor seasonal tour regions'
+Assert-Contains 'src/Rest/RequestController.php' 'rangeHasAllowedDay' 'range requests honor seasonal tour regions'
+Assert-Contains 'src/Admin/Menu.php' 'manual_visibility' 'manual calendar entries support internal and public tour stops'
+Assert-Contains 'src/Database/Schema.php' 'request_id BIGINT UNSIGNED NULL' 'public calendar events can remain linked to their request hub'
+Assert-Contains 'src/Admin/Menu.php' '$exportAppointments' 'linked public events are not exported twice'
+Assert-True (Test-Path (Join-Path $root 'tests/run-seasonal-state.php')) 'executable seasonal-state regression test exists'
 
 $visibleFiles = @(
     'templates/frontend-booking.php',

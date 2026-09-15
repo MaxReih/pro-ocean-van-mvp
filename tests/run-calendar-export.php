@@ -40,4 +40,22 @@ expect_export(($query['dates'] ?? '') === '20260806/20260807', 'the all-day appo
 expect_export(str_contains((string) ($query['location'] ?? ''), '73312'), 'the appointment address is included');
 expect_export(str_contains((string) ($query['details'] ?? ''), 'OV-TEST'), 'the request reference is included');
 
+$publicLink = (new IcsService())->googlePublicEventLink([
+    'calendar_date' => '2026-08-08',
+    'public_title' => 'Offener Meerestag',
+    'public_location' => 'Hafenplatz',
+    'public_description' => 'Öffentliches Programm',
+    'public_url' => 'https://example.org/event',
+], [
+    'contact_first_name' => 'Mara',
+    'contact_last_name' => 'Beispiel',
+    'contact_phone' => '040 1234',
+    'contact_email' => 'mara@example.org',
+    'public_uuid' => 'OV-PUBLIC',
+]);
+$publicQuery = [];
+parse_str((string) parse_url($publicLink, PHP_URL_QUERY), $publicQuery);
+expect_export(str_contains((string) ($publicQuery['details'] ?? ''), 'Mara Beispiel'), 'public event export includes its linked contact');
+expect_export(str_contains((string) ($publicQuery['details'] ?? ''), 'OV-PUBLIC'), 'public event export includes its request reference');
+
 echo "Calendar-export checks passed.\n";
