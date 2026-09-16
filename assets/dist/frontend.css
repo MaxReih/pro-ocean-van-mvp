@@ -668,7 +668,9 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-day small {
-  display: none;
+  display: block;
+  margin-top: 3px;
+  font-size: .58rem;
 }
 
 .pov-day[data-state="available"] {
@@ -750,6 +752,12 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+.pov-calendar-note {
+  margin: 10px 0 0;
+  color: var(--pov-muted);
+  font-size: .82rem;
 }
 
 .pov-calendar-actions[hidden] {

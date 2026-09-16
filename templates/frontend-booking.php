@@ -62,6 +62,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </div>
                 <div class="pov-live pov-calendar-status" role="status" aria-live="polite" data-role="calendar-status"></div>
                 <div class="pov-calendar" data-role="calendar" role="group" aria-label="Verfügbare Besuchstage" aria-busy="false"></div>
+                <p class="pov-calendar-note">Einzeltermine oder Zeiträume anfragbar</p>
                 <div class="pov-calendar-actions" data-role="calendar-selection" hidden>
                     <button type="button" class="pov-button" data-action="confirm-calendar-selection">Weiter <span aria-hidden="true">→</span></button>
                 </div>
