@@ -115,12 +115,11 @@ $initial = Invoke-BrowserExpression -Expression @'
 (() => ({
     headline: document.querySelector('.pov-hero h1')?.textContent.trim(),
     calendarVisible: !document.querySelector('[data-role="calendar-panel"]')?.hidden,
-    availableLabel: Array.from(document.querySelectorAll('.pov-legend span')).some((item) => item.textContent.includes('Noch verf\u00fcgbar')),
     publicEventLabel: Array.from(document.querySelectorAll('.pov-legend span')).some((item) => item.textContent.includes('\u00d6ffentliches Event'))
 }))()
 '@
 
-if ($initial.headline -ne 'Hol das Meer zu dir' -or -not $initial.calendarVisible -or -not $initial.availableLabel -or -not $initial.publicEventLabel) {
+if ($initial.headline -ne 'Hol das Meer zu dir' -or -not $initial.calendarVisible -or -not $initial.publicEventLabel) {
     throw "Kalenderpruefung fehlgeschlagen: $($initial | ConvertTo-Json -Compress)"
 }
 
@@ -140,11 +139,12 @@ Wait-BrowserExpression -Expression 'document.querySelector("[data-action=check-r
 
 Invoke-BrowserExpression -Expression @'
 (() => {
-    document.querySelector('[data-action="toggle-range"]').click();
-    document.querySelector('[data-range-field="from"]').value = '2026-08-26';
-    document.querySelector('[data-range-field="to"]').value = '2026-09-02';
-    document.querySelectorAll('[data-range-weekday]').forEach((field) => field.checked = true);
-    document.querySelector('[data-action="select-range"]').click();
+    const days = Array.from(document.querySelectorAll('.pov-day:not(:disabled)'))
+        .filter((day) => day.dataset.state !== 'walk_in');
+    if (!days.length) throw new Error('Kein auswählbarer Kalendertag');
+    days[0].click();
+    if (days[1]) days[1].click();
+    document.querySelector('[data-action="confirm-calendar-selection"]').click();
     return true;
 })()
 '@ | Out-Null

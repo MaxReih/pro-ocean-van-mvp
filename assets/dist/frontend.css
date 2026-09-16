@@ -250,7 +250,7 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 .pov-icon-button,
 .pov-back-button,
 .pov-text-button {
-  min-height: 46px;
+  min-height: 42px;
   margin: 0;
   border-radius: var(--pov-radius-sm);
   cursor: pointer;
@@ -262,12 +262,13 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 11px 18px;
+  gap: 10px;
+  padding: 9px 15px;
   color: var(--pov-white);
   background: var(--pov-blue);
   border: 1px solid var(--pov-blue);
-  box-shadow: 0 8px 18px rgba(19, 84, 118, .2);
+  font-size: .92rem;
+  box-shadow: 0 5px 12px rgba(19, 84, 118, .16);
 }
 
 .pov-button:hover {
@@ -301,10 +302,11 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-secondary-button {
-  padding: 10px 15px;
+  padding: 8px 13px;
   color: var(--pov-blue);
   background: var(--pov-white);
   border: 1px solid var(--pov-blue);
+  font-size: .92rem;
 }
 
 .pov-secondary-button:hover {
@@ -314,8 +316,8 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-icon-button {
-  width: 44px;
-  min-height: 44px;
+  width: 40px;
+  min-height: 40px;
   padding: 0;
   color: var(--pov-blue);
   background: var(--pov-white);
@@ -425,22 +427,12 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   gap: 10px;
 }
 
-.pov-section-note,
-.pov-recommendation-help {
-  color: var(--pov-muted);
-  font-size: .9rem;
-}
-
-.pov-recommendation-help {
-  margin: 12px 0 18px;
-}
-
 .pov-empty-state {
   display: grid;
   gap: 4px;
-  min-height: 92px;
+  min-height: 0;
   align-content: center;
-  padding: 18px;
+  padding: 12px 14px;
   color: var(--pov-ink);
   background: var(--pov-ice);
   border: 1px dashed var(--pov-mist);
@@ -453,8 +445,8 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-empty-state.is-warning {
-  background: rgba(245, 219, 162, .38);
-  border-color: var(--pov-sand);
+  background: var(--pov-ice);
+  border-color: var(--pov-mist);
 }
 
 .pov-suggestion {
@@ -462,7 +454,7 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
-  padding: 16px;
+  padding: 12px 14px;
   background: var(--pov-white);
   border: 1px solid var(--pov-mist);
   border-radius: var(--pov-radius);
@@ -471,12 +463,6 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 .pov-suggestion.is-best {
   background: linear-gradient(135deg, rgba(220, 241, 235, .7), var(--pov-white));
   border-color: #9ecdb2;
-}
-
-.pov-calendar-hint {
-  margin: 12px 0 0;
-  color: var(--pov-muted);
-  font-size: .88rem;
 }
 
 .pov-suggestion.is-week {
@@ -593,11 +579,6 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   border-radius: var(--pov-radius);
 }
 
-.pov-range-panel > h3 {
-  margin-bottom: 16px;
-  font-size: 1.35rem;
-}
-
 .pov-team-facilities > p {
   margin: -8px 0 16px;
   color: var(--pov-muted);
@@ -613,18 +594,6 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 .pov-walk-in-dialog a.pov-button:visited {
   color: var(--pov-white);
   text-decoration: none;
-}
-
-.pov-range-panel fieldset {
-  min-width: 0;
-  margin-right: 0;
-  margin-left: 0;
-  padding: 0;
-  border: 0;
-}
-
-.pov-range-panel > .pov-button {
-  margin-top: 18px;
 }
 
 .pov-calendar-details {
@@ -699,20 +668,25 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-day small {
-  margin-top: 3px;
-  font-size: .58rem;
+  display: none;
 }
 
 .pov-day[data-state="available"] {
-  color: var(--pov-green);
-  background: var(--pov-mint);
-  border-color: rgba(31, 92, 75, .48);
+  color: var(--pov-ink);
+  background: var(--pov-white);
+  border-color: var(--pov-mist);
 }
 
 .pov-day[data-state="limited"] {
   color: var(--pov-ink);
   background: var(--pov-sand);
   border-color: var(--pov-sand);
+}
+
+.pov-day[data-weekend="true"][data-requestable="true"] {
+  color: var(--pov-ink);
+  background: var(--pov-sand);
+  border-color: #dfbd6f;
 }
 
 .pov-day[data-state="tour"] {
@@ -735,9 +709,9 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-day[data-state="unavailable"] {
-  color: var(--pov-red);
-  background: #fbe7e4;
-  border-color: var(--pov-red);
+  color: #77878e;
+  background: #f1f4f5;
+  border-color: #d7e0e3;
   opacity: 1;
 }
 
@@ -755,83 +729,35 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   opacity: 1;
 }
 
-.pov-day[data-recommended="true"] {
-  box-shadow: inset 0 0 0 2px var(--pov-ink), 0 4px 12px rgba(0, 56, 82, .14);
-}
-
-.pov-day[data-selection="range"] {
-  outline: 2px solid var(--pov-blue);
-  outline-offset: -3px;
-}
-
+.pov-day[data-selection="range"],
 .pov-day[data-selection="single"],
 .pov-day[data-selection="start"],
 .pov-day[data-selection="end"] {
-  color: var(--pov-white);
-  background: var(--pov-blue);
-  border-color: var(--pov-blue);
-  box-shadow: inset 0 0 0 2px var(--pov-white), 0 4px 12px rgba(0, 56, 82, .2);
-}
-
-.pov-calendar-selection {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 14px;
-  padding: 14px 16px;
   color: var(--pov-ink);
-  background: var(--pov-mint);
-  border: 2px solid var(--pov-blue);
-  border-radius: 12px;
+  background: #dce2e5;
+  border-color: #8d9da4;
+  box-shadow: inset 0 0 0 1px #8d9da4;
 }
 
-.pov-calendar-selection[hidden] {
+.pov-day[data-recommended="true"] {
+  color: var(--pov-green);
+  background: var(--pov-mint);
+  border-color: #75ad8e;
+  box-shadow: inset 0 0 0 1px #75ad8e;
+}
+
+.pov-calendar-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.pov-calendar-actions[hidden] {
   display: none;
 }
 
-.pov-calendar-selection-copy {
-  display: grid;
-  gap: 3px;
-}
-
-.pov-calendar-selection-copy strong {
-  color: var(--pov-blue);
-}
-
-.pov-calendar-selection-copy span {
-  font-size: .88rem;
-}
-
-.pov-calendar-selection-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.pov-calendar-selection-actions .pov-button,
-.pov-calendar-selection-actions .pov-secondary-button,
-.pov-calendar-selection-actions .pov-text-button {
-  min-height: 42px;
-  white-space: nowrap;
-}
-
-@media (max-width: 760px) {
-  .pov-calendar-selection {
-    display: grid;
-  }
-
-  .pov-calendar-selection-actions {
-    display: grid;
-    justify-content: stretch;
-  }
-
-  .pov-calendar-selection-actions .pov-button,
-  .pov-calendar-selection-actions .pov-secondary-button,
-  .pov-calendar-selection-actions .pov-text-button {
-    width: 100%;
-  }
+.pov-calendar-actions .pov-button {
+  min-width: 112px;
 }
 
 .pov-day:disabled {
@@ -863,16 +789,6 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   border-radius: 3px;
 }
 
-.pov-legend .is-available {
-  background: var(--pov-mint);
-  border-color: var(--pov-green);
-}
-
-.pov-legend .is-limited {
-  background: var(--pov-sand);
-  border-color: var(--pov-sand);
-}
-
 .pov-legend .is-tour {
   background: var(--pov-blue);
 }
@@ -883,8 +799,8 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-legend .is-unavailable {
-  background: var(--pov-white);
-  border-color: var(--pov-red);
+  background: #f1f4f5;
+  border-color: #d7e0e3;
 }
 
 .pov-walk-in-dialog {
@@ -1243,19 +1159,16 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   letter-spacing: 0;
 }
 
-.pov-weekdays,
 .pov-question > div {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.pov-weekdays label,
 .pov-question label {
   display: block;
 }
 
-.pov-weekdays input,
 .pov-question input[type="radio"] {
   position: absolute;
   width: 1px;
@@ -1264,7 +1177,6 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   opacity: 0;
 }
 
-.pov-weekdays span,
 .pov-question label span {
   display: grid;
   min-width: 52px;
@@ -1279,14 +1191,12 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   font-weight: 800;
 }
 
-.pov-weekdays input:checked + span,
 .pov-question input[type="radio"]:checked + span {
   color: var(--pov-white);
   background: var(--pov-blue);
   border-color: var(--pov-blue);
 }
 
-.pov-weekdays input:focus-visible + span,
 .pov-question input[type="radio"]:focus-visible + span {
   outline: 3px solid rgba(19, 84, 118, .24);
   outline-offset: 2px;
@@ -1625,7 +1535,8 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   .pov-suggestion.is-top-date > .pov-button,
   .pov-suggestion.is-top-date > .pov-secondary-button {
     grid-column: 1 / -1;
-    width: 100%;
+    width: auto;
+    justify-self: start;
   }
 
   .pov-route-alternatives {

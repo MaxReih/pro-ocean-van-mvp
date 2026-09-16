@@ -45,20 +45,14 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
 
             <section class="pov-recommendations" aria-labelledby="pov-recommendation-title">
                 <div class="pov-subheading">
-                    <div>
-                        <strong id="pov-recommendation-title" class="pov-section-title">Unsere Terminvorschläge</strong>
-                        <span class="pov-section-note">Diese Termine können wir euch für euren Einsatzort besonders gut anbieten.</span>
-                    </div>
+                    <strong id="pov-recommendation-title" class="pov-section-title">Unsere Terminvorschläge</strong>
                 </div>
                 <div class="pov-suggestions" data-role="suggestions" aria-live="polite" aria-busy="false">
                     <div class="pov-empty-state">
-                        <strong>Gebt euren Ort ein.</strong>
-                        <span>Dann zeigen wir passende Tage und Wochen.</span>
+                        <strong>Ort eingeben</strong>
                     </div>
                 </div>
             </section>
-
-            <p class="pov-recommendation-help">Kein passender Termin dabei? Schaut euch weitere verfügbare Termine an oder gebt uns euren Wunschzeitraum an.</p>
 
             <section class="pov-option-panel" id="pov-calendar-panel" data-role="calendar-panel" aria-labelledby="pov-calendar-title">
                 <div class="pov-calendar-toolbar">
@@ -68,51 +62,14 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </div>
                 <div class="pov-live pov-calendar-status" role="status" aria-live="polite" data-role="calendar-status"></div>
                 <div class="pov-calendar" data-role="calendar" role="group" aria-label="Verfügbare Besuchstage" aria-busy="false"></div>
-                <p class="pov-calendar-hint">Tag anklicken, optional Zeitraum oder Woche wählen und anschließend bestätigen.</p>
-                <div class="pov-calendar-selection" data-role="calendar-selection" aria-live="polite" hidden>
-                    <div class="pov-calendar-selection-copy">
-                        <strong data-role="calendar-selection-title">Auswahl noch bestätigen</strong>
-                        <span data-role="calendar-selection-summary"></span>
-                    </div>
-                    <div class="pov-calendar-selection-actions">
-                        <button type="button" class="pov-text-button" data-action="clear-calendar-selection">Auswahl löschen</button>
-                        <button type="button" class="pov-secondary-button" data-action="select-calendar-week">Ganze Woche wählen</button>
-                        <button type="button" class="pov-button" data-action="confirm-calendar-selection">Einzeltag bestätigen <span aria-hidden="true">→</span></button>
-                    </div>
+                <div class="pov-calendar-actions" data-role="calendar-selection" hidden>
+                    <button type="button" class="pov-button" data-action="confirm-calendar-selection">Weiter <span aria-hidden="true">→</span></button>
                 </div>
                 <div class="pov-legend" aria-label="Kalenderlegende">
-                    <span><i class="is-available"></i>Verfügbar</span>
-                    <span><i class="is-limited"></i>Auf Anfrage</span>
                     <span><i class="is-tour"></i>Van unterwegs</span>
                     <span><i class="is-walk-in"></i>Öffentliches Event</span>
                     <span><i class="is-unavailable"></i>Nicht buchbar</span>
                 </div>
-            </section>
-
-            <section class="pov-option-panel pov-range-panel" id="pov-range-panel" data-role="range-panel" aria-labelledby="pov-range-title">
-                <h3 id="pov-range-title" tabindex="-1">Wunschzeitraum anfragen</h3>
-                <div class="pov-grid-2">
-                    <label>Frühester Termin
-                        <input type="date" data-range-field="from">
-                    </label>
-                    <label>Spätester Termin
-                        <input type="date" data-range-field="to">
-                    </label>
-                </div>
-                <fieldset class="pov-choice-fieldset" data-range-weekday-group>
-                    <legend>Mögliche Wochentage</legend>
-                    <div class="pov-weekdays">
-                        <label><input type="checkbox" data-range-weekday value="mon"><span>Mo</span></label>
-                        <label><input type="checkbox" data-range-weekday value="tue"><span>Di</span></label>
-                        <label><input type="checkbox" data-range-weekday value="wed"><span>Mi</span></label>
-                        <label><input type="checkbox" data-range-weekday value="thu"><span>Do</span></label>
-                        <label><input type="checkbox" data-range-weekday value="fri"><span>Fr</span></label>
-                        <label><input type="checkbox" data-range-weekday value="sat"><span>Sa</span></label>
-                        <label><input type="checkbox" data-range-weekday value="sun"><span>So</span></label>
-                    </div>
-                </fieldset>
-                <div class="pov-live" role="status" aria-live="polite" data-role="range-status"></div>
-                <button type="button" class="pov-button" data-action="select-range">Mit Zeitraum weiter <span aria-hidden="true">→</span></button>
             </section>
         </div>
     </section>

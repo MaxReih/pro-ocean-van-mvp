@@ -17,8 +17,6 @@
   const routeStatus = $('[data-role="route-status"]');
   const suggestionsElement = $('[data-role="suggestions"]');
   const calendarElement = $('[data-role="calendar"]');
-  const rangeFrom = $('[data-range-field="from"]');
-  const rangeTo = $('[data-range-field="to"]');
 
   routeStatus.id = 'pov-route-status';
 
@@ -489,18 +487,7 @@
   function renderCalendarSelection() {
     const panel = $('[data-role="calendar-selection"]');
     if (!panel) return;
-    if (!state.pendingCalendarStart) {
-      panel.hidden = true;
-      return;
-    }
-    panel.hidden = false;
-    const isRange = state.pendingCalendarHasEnd;
-    $('[data-role="calendar-selection-title"]').textContent = 'Auswahl noch bestätigen';
-    $('[data-role="calendar-selection-summary"]').textContent = isRange
-      ? formatDate(state.pendingCalendarStart, 'medium') + ' bis ' + formatDate(state.pendingCalendarEnd, 'medium')
-      : formatDate(state.pendingCalendarStart) + ' – weiteren Tag für Zeitraum wählen';
-    const confirm = $('[data-action="confirm-calendar-selection"]');
-    confirm.innerHTML = (isRange ? 'Zeitraum bestätigen' : 'Einzeltag bestätigen') + ' <span aria-hidden="true">→</span>';
+    panel.hidden = !state.pendingCalendarStart;
   }
 
   function stageCalendarDate(date) {
@@ -539,13 +526,6 @@
     return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter(function (day) { return selected.has(day); });
   }
 
-  function syncRangeSelection(start, end, weekdays) {
-    rangeFrom.value = start;
-    rangeTo.value = end;
-    rangeTo.min = start;
-    $$('[data-range-weekday]').forEach(function (field) { field.checked = weekdays.includes(field.value); });
-  }
-
   function confirmCalendarSelection() {
     if (!state.pendingCalendarStart || !ensureActiveRoute()) return;
     const start = state.pendingCalendarStart;
@@ -564,23 +544,10 @@
       state.rangeFrom = start;
       state.rangeTo = end;
       state.possibleWeekdays = weekdays;
-      syncRangeSelection(start, end, weekdays);
     }
     clearPendingCalendarSelection();
     renderCalendar();
     openForm();
-  }
-
-  function selectCalendarWeek() {
-    if (!state.pendingCalendarStart) return;
-    const selected = new Date(state.pendingCalendarStart + 'T12:00:00');
-    const monday = new Date(selected);
-    monday.setDate(selected.getDate() - ((selected.getDay() + 6) % 7));
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const start = monday < today ? today : monday;
-    const end = sunday > horizon ? horizon : sunday;
-    setPendingCalendarSelection(iso(start), iso(end), iso(start) !== iso(end));
   }
 
   function selectSuggestedWeek(week) {
@@ -612,50 +579,6 @@
     const dialog = $('[data-role="walk-in-dialog"]');
     if (typeof dialog.close === 'function') dialog.close();
     else dialog.removeAttribute('open');
-  }
-
-  function setRangeStatus(message, type) {
-    const status = $('[data-role="range-status"]');
-    status.textContent = message || '';
-    status.className = 'pov-live' + (type ? ' is-' + type : '');
-    status.setAttribute('role', type === 'error' ? 'alert' : 'status');
-  }
-
-  function clearRangeErrors() {
-    [rangeFrom, rangeTo].forEach(function (field) {
-      field.removeAttribute('aria-invalid');
-      field.removeAttribute('aria-describedby');
-    });
-    $('[data-range-weekday-group]').removeAttribute('aria-invalid');
-  }
-
-  function selectRange() {
-    clearRangeErrors();
-    const weekdays = $$('[data-range-weekday]:checked').map(function (field) { return field.value; });
-    const invalid = [];
-    if (!rangeFrom.value || rangeFrom.value < iso(today)) invalid.push(rangeFrom);
-    if (!rangeTo.value || rangeTo.value < rangeFrom.value || rangeTo.value > iso(horizon)) invalid.push(rangeTo);
-    if (!weekdays.length) $('[data-range-weekday-group]').setAttribute('aria-invalid', 'true');
-
-    if (invalid.length || !weekdays.length) {
-      invalid.forEach(function (field) { field.setAttribute('aria-invalid', 'true'); });
-      setRangeStatus('Bitte Zeitraum und mindestens einen Wochentag prüfen.', 'error');
-      if (invalid[0]) invalid[0].focus();
-      else $('[data-range-weekday]').focus();
-      return;
-    }
-    if (!ensureActiveRoute()) return;
-
-    state.mode = 'date_range';
-    state.selectedDate = '';
-    state.rangeFrom = rangeFrom.value;
-    state.rangeTo = rangeTo.value;
-    state.possibleWeekdays = weekdays;
-    state.selectedRecommendation = null;
-    clearPendingCalendarSelection();
-    renderCalendar();
-    setRangeStatus('');
-    openForm();
   }
 
   function selectedDateLabel() {
@@ -1094,13 +1017,7 @@
     }
     if (action === 'check-route') checkRoute();
     if (action === 'close-walk-in') closeWalkIn();
-    if (action === 'clear-calendar-selection') {
-      clearPendingCalendarSelection();
-      renderCalendar();
-    }
-    if (action === 'select-calendar-week') selectCalendarWeek();
     if (action === 'confirm-calendar-selection') confirmCalendarSelection();
-    if (action === 'select-range') selectRange();
     if (action === 'back-route') backToRoute();
     if (action === 'recheck-form-route') recheckFormRoute();
     if (target.matches('[data-next]')) moveNext();
@@ -1145,10 +1062,6 @@
   ['street', 'house_number', 'city'].forEach(function (name) {
     form.elements[name].addEventListener('change', trackAddressChange);
   });
-  rangeFrom.addEventListener('change', function () {
-    rangeTo.min = rangeFrom.value || iso(today);
-    if (rangeTo.value && rangeTo.value < rangeTo.min) rangeTo.value = rangeTo.min;
-  });
   form.addEventListener('input', function () {
     if (state.step === 2) renderSummary();
   });
@@ -1157,17 +1070,6 @@
   });
   form.addEventListener('submit', submitForm);
 
-  const defaultFrom = new Date(today);
-  defaultFrom.setDate(defaultFrom.getDate() + 14);
-  const defaultTo = new Date(defaultFrom);
-  defaultTo.setDate(defaultTo.getDate() + 28);
-  rangeFrom.min = iso(today);
-  rangeFrom.max = iso(horizon);
-  rangeFrom.value = iso(defaultFrom);
-  rangeTo.min = rangeFrom.value;
-  rangeTo.max = iso(horizon);
-  rangeTo.value = iso(defaultTo);
-  $$('[data-range-weekday]').forEach(function (field) { field.checked = true; });
   updateEventTypeSections();
   updateVenueSections();
   updateOtherFields();

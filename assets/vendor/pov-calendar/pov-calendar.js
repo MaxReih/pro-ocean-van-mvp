@@ -106,7 +106,7 @@
         const selectedLabel = selection ? ', ausgewählt' : '';
         button.setAttribute('aria-label', `${readableDate}: ${row.public_label}${recommended}${selectedLabel}`);
         button.setAttribute('aria-pressed', inSelection ? 'true' : 'false');
-        button.innerHTML = `<strong>${d}</strong><small>${POVCalendar.escape(row.public_label)}</small>`;
+        button.innerHTML = `<strong>${d}</strong>`;
         button.addEventListener('click', () => {
           if (row.is_interactive && this.options.onDetails) {
             this.options.onDetails(date, row);
