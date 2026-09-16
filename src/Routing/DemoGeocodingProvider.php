@@ -22,6 +22,7 @@ final class DemoGeocodingProvider implements GeocodingProviderInterface
         '54290' => [49.7499, 6.6371, 'Trier'],
         '66111' => [49.2402, 6.9969, 'Saarbrücken'],
         '70178' => [48.7672, 9.1685, 'Stuttgart'],
+        '70180' => [48.7643, 9.1681, 'Stuttgart'],
         '72072' => [48.5033, 9.0537, 'Tübingen'],
         '73312' => [48.6242, 9.8274, 'Geislingen an der Steige'],
         '90403' => [49.4559, 11.0786, 'Nürnberg'],

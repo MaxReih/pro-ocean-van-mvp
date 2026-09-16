@@ -17,6 +17,8 @@ use ProOceanVan\Routing\ProviderFactory;
 final class PublicRecommendationService
 {
     private const LIMITED_DAY_PENALTY = 25.0;
+    private const REGIONAL_CLUSTER_BONUS = 70.0;
+    private const ROAD_DISTANCE_FACTOR = 1.22;
     private const MIN_RECOMMENDATION_LEAD_DAYS = 14;
 
     public function recommend(string $postalCode, string $stateCode): array
@@ -98,6 +100,7 @@ final class PublicRecommendationService
             }
             $week = $day->format('o-W');
             $anchors = $this->weekAnchors($week, $appointments);
+            $regionalCluster = $this->isRegionalCluster($anchors, $geo, $stateCode);
             $anchorKey = $anchors ? md5(wp_json_encode(array_map(static fn (array $anchor): array => [
                 'appointment_date' => $anchor['appointment_date'] ?? null,
                 'latitude' => $anchor['latitude'] ?? null,
@@ -150,11 +153,16 @@ final class PublicRecommendationService
             if (($comparison['matrix_source'] ?? '') !== 'osrm') {
                 $codes[] = 'ROUTING_ESTIMATED';
             }
+            if ($regionalCluster) {
+                $codes[] = 'REGIONAL_CLUSTER';
+            }
 
             $score = $cost + ($effectiveDistance / 5);
-            if ($state === CalendarState::LIMITED) {
+            if ($state === CalendarState::LIMITED && ! $regionalCluster) {
                 $score += self::LIMITED_DAY_PENALTY;
                 $codes[] = 'LIMITED_DAY';
+            } elseif ($state === CalendarState::LIMITED) {
+                $codes[] = 'PLANNED_TOUR_WINDOW';
             }
             $score -= min(50.0, (float) $comparison['cost_saved'] * 0.15);
             if ($anchorCount > 0) {
@@ -167,6 +175,9 @@ final class PublicRecommendationService
             }
             if (($comparison['matrix_source'] ?? '') !== 'osrm') {
                 $score += 5.0;
+            }
+            if ($regionalCluster) {
+                $score -= self::REGIONAL_CLUSTER_BONUS;
             }
             if ($cost < ((float) get_option('pov_max_public_suggestion_cost', 999999) * 0.6)) {
                 $codes[] = 'LOW_TRAVEL_COST';
@@ -285,6 +296,35 @@ final class PublicRecommendationService
             }
         }
         return $slot;
+    }
+
+    private function isRegionalCluster(array $anchors, array $candidate, string $stateCode): bool
+    {
+        if (! is_numeric($candidate['latitude'] ?? null) || ! is_numeric($candidate['longitude'] ?? null)) {
+            return false;
+        }
+        $radius = max(1.0, (float) get_option('pov_cluster_radius_km', 80));
+        foreach ($anchors as $anchor) {
+            if (strtoupper((string) ($anchor['state_code'] ?? '')) !== strtoupper($stateCode)
+                || ! is_numeric($anchor['latitude'] ?? null)
+                || ! is_numeric($anchor['longitude'] ?? null)) {
+                continue;
+            }
+            if ($this->distanceKm($candidate, $anchor) <= $radius) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function distanceKm(array $from, array $to): float
+    {
+        $lat1 = deg2rad((float) $from['latitude']);
+        $lat2 = deg2rad((float) $to['latitude']);
+        $deltaLat = $lat2 - $lat1;
+        $deltaLon = deg2rad((float) $to['longitude'] - (float) $from['longitude']);
+        $a = sin($deltaLat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($deltaLon / 2) ** 2;
+        return 6371.0 * 2 * atan2(sqrt($a), sqrt(max(0.0, 1 - $a))) * self::ROAD_DISTANCE_FACTOR;
     }
 
     private function publicReason(array $codes): string
