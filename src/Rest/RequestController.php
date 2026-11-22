@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace ProOceanVan\Rest;
 
 use DateTimeImmutable;
-use ProOceanVan\Repository\AppointmentRepository;
-use ProOceanVan\Repository\CalendarDayRepository;
+use ProOceanVan\Domain\SchoolClasses;
 use ProOceanVan\Repository\RequestRepository;
 use ProOceanVan\Repository\StateRepository;
 use ProOceanVan\Service\EligibilityTokenService;
 use ProOceanVan\Service\MailService;
 use ProOceanVan\Service\RequestRoutingService;
-use ProOceanVan\Service\SeasonalStateService;
+use ProOceanVan\Service\AvailabilityService;
 use ProOceanVan\Security\FrontendAccess;
 use WP_Error;
 use WP_REST_Request;
@@ -49,6 +48,9 @@ final class RequestController
         'school_needs' => 5000,
         'school_schedule_notes' => 5000,
         'school_lesson_duration' => 16,
+        'school_support' => 16,
+        'school_support_amount' => 16,
+        'school_support_note' => 500,
         'event_child_age_range' => 120,
         'occasion_description' => 5000,
         'availability_window' => 32,
@@ -93,6 +95,15 @@ final class RequestController
         $validation = $this->validate($payload);
         if ($validation) {
             return new WP_Error('pov_validation', $validation, ['status' => 422]);
+        }
+        $school = $payload['institution_type'] === 'Schule';
+        if ($school && empty($payload['school_grade'])) {
+            $payload['classes'] = SchoolClasses::normalize($payload['classes'], SchoolClasses::configuredGrades());
+        } else {
+            $payload['classes'] = array_map(static fn (array $class): array => array_intersect_key($class, array_flip(['class_name', 'grade', 'participant_count'])), $payload['classes']);
+        }
+        if (! $school) {
+            unset($payload['school_support'], $payload['school_support_amount'], $payload['school_support_note']);
         }
 
         $payload = (new RequestRoutingService())->enrich($payload);
@@ -151,19 +162,35 @@ final class RequestController
             return 'Bitte prüfe die Anzahl der Kinder und Erwachsenen.';
         }
         $institutionType = (string) ($payload['institution_type'] ?? '');
-        if (! in_array($institutionType, ['Schule', 'Veranstaltung', 'Sonstiges'], true)) {
+        if (! in_array($institutionType, ['Schule', 'Veranstaltung', 'Unternehmen', 'Sonstiges'], true)) {
             return 'Bitte wähle eine Veranstaltungsart.';
         }
         if ($institutionType === 'Schule') {
-            $grades = $this->publicSchoolGrades();
-            $classCount = filter_var($payload['school_class_count'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 50]]);
-            $teachersPerClass = filter_var($payload['school_teachers_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 20]]);
-            $childrenPerClass = filter_var($payload['school_children_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
-            if (! in_array((string) ($payload['school_grade'] ?? ''), $grades, true) || $classCount === false || $teachersPerClass === false || $childrenPerClass === false) {
-                return 'Bitte prüfe Klassenstufe, Klassenanzahl und Gruppengröße.';
+            if (! empty($payload['school_grade'])) {
+                // Ältere Buchungsseiten senden noch eine gemeinsame Klassenaufteilung.
+                $grades = array_map(static fn (int $grade): string => 'grade_' . $grade, SchoolClasses::configuredGrades());
+                $classCount = filter_var($payload['school_class_count'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 50]]);
+                $teachers = filter_var($payload['school_teachers_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 20]]);
+                $childrenPerClass = filter_var($payload['school_children_per_class'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
+                if (! in_array($payload['school_grade'], $grades, true) || $classCount === false || $teachers === false
+                    || $childrenPerClass === false || $children !== $classCount * $childrenPerClass) {
+                    return 'Bitte prüfe Klassenstufe, Klassenanzahl und Gruppengröße.';
+                }
+            } else {
+                $classes = SchoolClasses::normalize((array) ($payload['classes'] ?? []), SchoolClasses::configuredGrades());
+                if (! $classes || count($classes) !== filter_var($payload['school_class_count'] ?? null, FILTER_VALIDATE_INT)
+                    || array_sum(array_column($classes, 'children')) !== $children
+                    || array_sum(array_column($classes, 'teachers')) + array_sum(array_column($classes, 'adults')) !== $adults) {
+                    return 'Bitte prüfe die Angaben zu allen Klassen.';
+                }
+                if (trim((string) ($payload['school_schedule_notes'] ?? '')) === '') {
+                    return 'Bitte gib die Unterrichts- und Pausenzeiten an oder vermerke, dass sie nachgereicht werden.';
+                }
             }
-            if ($children !== $classCount * $childrenPerClass) {
-                return 'Bitte prüfe die Teilnehmenden- und Lehrpersonalzahlen.';
+            $amount = (string) ($payload['school_support_amount'] ?? '');
+            if (! in_array((string) ($payload['school_support'] ?? ''), ['', 'yes', 'no'], true)
+                || ($amount !== '' && (! preg_match('/^\d{1,6}(\.\d{1,2})?$/', $amount) || (float) $amount > 100000))) {
+                return 'Bitte prüfe die Angaben zur freiwilligen Unterstützung.';
             }
             if (! in_array((string) ($payload['school_lesson_duration'] ?? ''), ['45', '60', '90'], true)) {
                 return 'Bitte wähle die Dauer einer Unterrichtseinheit.';
@@ -172,7 +199,7 @@ final class RequestController
         if ($institutionType === 'Veranstaltung' && $children > 0 && trim((string) ($payload['event_child_age_range'] ?? '')) === '') {
             return 'Bitte gib die Altersrange der teilnehmenden Kinder an.';
         }
-        if ($institutionType === 'Sonstiges' && trim((string) ($payload['occasion_description'] ?? '')) === '') {
+        if (in_array($institutionType, ['Sonstiges', 'Unternehmen'], true) && trim((string) ($payload['occasion_description'] ?? '')) === '') {
             return 'Bitte beschreibe die Veranstaltungsart oder den Anlass.';
         }
         if (! in_array((string) ($payload['availability_window'] ?? ''), ['morning', 'afternoon', 'full_day'], true)) {
@@ -186,6 +213,8 @@ final class RequestController
         $todayDate = new DateTimeImmutable('today', wp_timezone());
         $today = $todayDate->format('Y-m-d');
         $latestDate = $todayDate->modify('+' . self::MAX_BOOKING_MONTHS . ' months');
+        $availability = new AvailabilityService();
+        $stateCode = (string) ($payload['state_code'] ?? '');
         if ($mode === 'specific_date') {
             $date = (string) ($payload['specific_requested_date'] ?? '');
             if (! $this->validDate($date)) {
@@ -203,7 +232,7 @@ final class RequestController
             )) {
                 return 'Dieser Tag passt nicht mehr zur geprüften Route. Bitte suche die Termine erneut.';
             }
-            if ((new CalendarDayRepository())->isBlocked($date) || (new AppointmentRepository())->existsOnDate($date)) {
+            if (! $availability->requestableDates($stateCode, $date, $date, [strtolower($requestedDate->format('D'))])) {
                 return 'Dieser Tag ist inzwischen nicht mehr verfügbar. Bitte wähle einen anderen Termin.';
             }
         } else {
@@ -225,8 +254,8 @@ final class RequestController
             if (! $weekdays) {
                 return 'Bitte wähle mindestens einen möglichen Wochentag.';
             }
-            if (! (new SeasonalStateService())->rangeHasAllowedDay((string) ($payload['state_code'] ?? ''), $from, $to, $weekdays)) {
-                return 'In diesem Zeitraum ist das gewählte Bundesland nicht für Anfragen freigegeben.';
+            if (! $availability->requestableDates($stateCode, $from, $to, $weekdays)) {
+                return 'Für die gewählten Tage ist im gewünschten Zeitraum kein Termin anfragbar. Bitte passe die Auswahl an.';
             }
         }
         if (empty($payload['classes']) || ! is_array($payload['classes'])) {
@@ -247,7 +276,7 @@ final class RequestController
             }
             $className = trim((string) ($class['class_name'] ?? ''));
             $participantCount = (int) ($class['participant_count'] ?? 0);
-            if ($className === '' || $this->textLength($className) > 80 || $participantCount < 1 || $participantCount > self::MAX_PARTICIPANTS || (int) ($class['grade'] ?? 0) < 1 || (int) ($class['grade'] ?? 0) > 6) {
+            if ($className === '' || $this->textLength($className) > 80 || $participantCount < 1 || $participantCount > self::MAX_PARTICIPANTS || (int) ($class['grade'] ?? 0) < 1 || (int) ($class['grade'] ?? 0) > 13) {
                 return 'Bitte prüfe die Klassenangaben.';
             }
             $participants += $participantCount;
@@ -319,18 +348,6 @@ final class RequestController
             return false;
         }
         return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]);
-    }
-
-    private function publicSchoolGrades(): array
-    {
-        $configured = array_filter(array_map('trim', explode(',', (string) get_option('pov_school_grade_options', '3,4'))));
-        $grades = [];
-        foreach ($configured as $grade) {
-            if (ctype_digit($grade) && (int) $grade >= 1 && (int) $grade <= 13) {
-                $grades[] = 'grade_' . (int) $grade;
-            }
-        }
-        return $grades ?: ['grade_3', 'grade_4'];
     }
 
     private function textLength(string $value): int

@@ -31,12 +31,15 @@ final class ClassRepository
             if ($participants <= 0) {
                 break;
             }
-            $grade = min(6, max(1, (int) ($class['grade'] ?? 1)));
+            $grade = min(13, max(1, (int) ($class['grade'] ?? 1)));
             $wpdb->insert($table, [
                 'request_id' => $requestId,
                 'class_name' => sanitize_text_field((string) ($class['class_name'] ?? '')),
                 'grade' => $grade,
                 'participant_count' => $participants,
+                'children' => isset($class['children']) ? (int) $class['children'] : null,
+                'teachers' => isset($class['teachers']) ? (int) $class['teachers'] : null,
+                'adults' => isset($class['adults']) ? (int) $class['adults'] : null,
                 'sort_order' => $order,
                 'created_at' => current_time('mysql'),
             ]);

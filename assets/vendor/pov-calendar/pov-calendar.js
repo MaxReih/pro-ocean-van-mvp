@@ -80,15 +80,17 @@
           is_selectable: false,
           is_weekend: false
         };
-        const button = document.createElement('button');
-        button.type = 'button';
+        const displayOnly = this.options.overview && !row.is_interactive;
+        const button = document.createElement(displayOnly ? 'div' : 'button');
+        if (displayOnly) button.setAttribute('role', 'group');
+        else button.type = 'button';
         button.className = 'pov-day';
         button.dataset.date = date;
         button.dataset.state = row.public_state;
         button.dataset.weekend = row.is_weekend ? 'true' : 'false';
         button.dataset.requestable = row.is_requestable ? 'true' : 'false';
         button.dataset.recommended = this.recommended.has(date) ? 'true' : 'false';
-        button.disabled = !row.is_selectable && !row.is_interactive && !row.is_requestable;
+        if (!displayOnly) button.disabled = !row.is_selectable && !row.is_interactive && !row.is_requestable;
         const readableDate = new Intl.DateTimeFormat('de-DE', {
           weekday: 'long',
           day: 'numeric',
@@ -105,7 +107,7 @@
         if (selection) button.dataset.selection = selection;
         const selectedLabel = selection ? ', ausgewählt' : '';
         button.setAttribute('aria-label', `${readableDate}: ${row.public_label}${recommended}${selectedLabel}`);
-        button.setAttribute('aria-pressed', inSelection ? 'true' : 'false');
+        if (!displayOnly && !row.is_interactive) button.setAttribute('aria-pressed', inSelection ? 'true' : 'false');
         const publicHint = ['tour', 'walk_in'].includes(row.public_state)
           ? `<small>${POVCalendar.escape(row.public_label)}</small>`
           : '';

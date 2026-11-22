@@ -25,6 +25,31 @@ final class PublicCalendarController
                 'end' => ['sanitize_callback' => 'sanitize_text_field'],
             ],
         ]);
+        register_rest_route($this->namespace, '/availability', [
+            'methods' => 'GET',
+            'callback' => [$this, 'availability'],
+            'permission_callback' => [FrontendAccess::class, 'authorizeRest'],
+            'args' => array_fill_keys(['state_code', 'from', 'to', 'weekdays'], [
+                'type' => 'string',
+                'required' => true,
+                'validate_callback' => 'rest_validate_request_arg',
+            ]),
+        ]);
+    }
+
+    public function availability(WP_REST_Request $request): array
+    {
+        $state = strtoupper(sanitize_key((string) $request->get_param('state_code')));
+        if (! (new \ProOceanVan\Repository\StateRepository())->isActive($state)) {
+            return ['available' => false];
+        }
+        $days = (new AvailabilityService())->requestableDates(
+            $state,
+            (string) $request->get_param('from'),
+            (string) $request->get_param('to'),
+            explode(',', (string) $request->get_param('weekdays'))
+        );
+        return ['available' => (bool) $days];
     }
 
     public function calendar(WP_REST_Request $request): array|WP_Error

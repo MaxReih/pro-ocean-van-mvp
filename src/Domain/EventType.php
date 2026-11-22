@@ -10,10 +10,14 @@ final class EventType
     public const EVENT = 'event';
     public const WALK_IN = 'walk_in';
     public const OTHER = 'other';
+    public const COMPANY = 'company';
 
     public static function normalize(string $value): string
     {
         $value = strtolower(remove_accents(trim($value)));
+        if ($value === 'unternehmen' || $value === self::COMPANY) {
+            return self::COMPANY;
+        }
         if (str_contains($value, 'schule')) {
             return self::SCHOOL;
         }
@@ -33,6 +37,7 @@ final class EventType
         return [
             self::SCHOOL => 'Schule',
             self::EVENT => 'Veranstaltung',
+            self::COMPANY => 'Unternehmen',
             self::WALK_IN => 'Walk-in-Event',
             self::OTHER => 'Sonstiges',
         ];

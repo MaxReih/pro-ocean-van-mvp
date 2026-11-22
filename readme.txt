@@ -3,7 +3,7 @@ Contributors: proocean
 Tags: booking, calendar, routing
 Requires at least: 6.5
 Requires PHP: 8.1
-Stable tag: 0.9.5
+Stable tag: 0.10.0
 License: GPLv2 or later
 
 Route-first Ocean-Van-Buchung und kostenoptimierte Tourenplanung für WordPress.
@@ -21,6 +21,11 @@ Das Plugin stellt den Shortcode [pro_ocean_van_booking], routenoptimierte Termin
 5. Shortcode in eine Seite einfügen.
 
 == Changelog ==
+
+= 0.10.0 =
+* Wunschtermin und Wunschzeitraum teilen sich eine Auswahl. Der öffentliche Kalender zeigt Tourstopps und Events. Frontend und Server prüfen gemeinsam Kalenderfreigaben, Wochentage und freie Termine.
+* Schulklassen werden einzeln erfasst. Freiwillige Unterstützung und Unternehmen als Veranstaltungsart sind ergänzt.
+* Team-Kalender mit Tagesliste und Vor-Ort-Feldern, deutsche Datumsangaben in E-Mails, Buchungsübersicht und ergänzte Kalenderexporte.
 
 = 0.9.5 =
 * Nahe bestätigte Stopps im selben Bundesland priorisieren die zugehörige Tourwoche vor rechnerisch günstigen Rückwegterminen.

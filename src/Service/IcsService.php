@@ -18,6 +18,7 @@ final class IcsService
             $contact['phone'] !== '' ? 'Telefon: ' . $contact['phone'] : '',
             $contact['email'] !== '' ? 'E-Mail: ' . $contact['email'] : '',
             ! empty($request['public_uuid']) ? 'Anfrage: ' . (string) $request['public_uuid'] : '',
+            ...$this->planningDetails($request),
         ]));
         return implode("\r\n", [
             'BEGIN:VCALENDAR',
@@ -50,6 +51,7 @@ final class IcsService
             $contact['phone'] !== '' ? 'Telefon: ' . $contact['phone'] : '',
             $contact['email'] !== '' ? 'E-Mail: ' . $contact['email'] : '',
             ! empty($request['public_uuid']) ? 'Anfrage: ' . (string) $request['public_uuid'] : '',
+            ...$this->planningDetails($request),
         ]));
         return add_query_arg([
             'action' => 'TEMPLATE',
@@ -66,12 +68,13 @@ final class IcsService
         $summary = 'Ocean Van - ' . (string) $appointment['institution_name'];
         $location = trim((string) $appointment['street'] . ' ' . (string) $appointment['house_number'] . ', ' . (string) $appointment['postal_code'] . ' ' . (string) $appointment['city']);
         $contact = $this->contact($appointment, $request);
-        $description = implode("\\n", array_filter([
+        $description = implode("\n", array_filter([
             'Kontakt: ' . $contact['name'],
             'Telefon: ' . $contact['phone'],
             'E-Mail: ' . $contact['email'],
             'Anfrage: ' . (string) ($request['public_uuid'] ?? $appointment['request_id'] ?? ''),
             (string) ($appointment['internal_notes'] ?? ''),
+            ...$this->planningDetails($request),
         ]));
 
         return implode("\r\n", array_filter([
@@ -106,6 +109,7 @@ final class IcsService
             'Telefon: ' . $contact['phone'],
             'E-Mail: ' . $contact['email'],
             'Anfrage: ' . (string) ($request['public_uuid'] ?? ''),
+            ...$this->planningDetails($request),
         ]));
 
         return add_query_arg([
@@ -134,5 +138,28 @@ final class IcsService
             'phone' => (string) (($appointment['contact_phone'] ?? '') ?: ($request['contact_phone'] ?? '')),
             'email' => (string) (($appointment['contact_email'] ?? '') ?: ($request['contact_email'] ?? '')),
         ];
+    }
+
+    private function planningDetails(array $request): array
+    {
+        $slot = ['morning' => 'Vormittag', 'afternoon' => 'Nachmittag', 'full_day' => 'Ganztägig'][(string) ($request['availability_window'] ?? '')] ?? '';
+        $parking = ['schoolyard' => 'Schulhof', 'parking_lot' => 'Parkplatz', 'street' => 'Straßenrand / Ladezone', 'other' => 'Sonstiger Stellplatz'][(string) ($request['parking_type'] ?? '')] ?? '';
+        $venue = ['indoor' => 'Innenraum', 'outdoor' => 'Außenbereich', 'both' => 'Innen- und Außenbereich'][(string) ($request['venue_type'] ?? '')] ?? '';
+        $lines = [];
+        foreach ([
+            'Veranstaltungsart' => $request['institution_type'] ?? '',
+            'Zeitliche Verfügbarkeit' => $slot,
+            'Einsatzbereich' => $venue,
+            'Stellplatz' => $parking,
+            'Stellplatz-Link' => $request['parking_location'] ?? '',
+        ] as $label => $value) {
+            if ($value !== '') {
+                $lines[] = $label . ': ' . (string) $value;
+            }
+        }
+        if (is_numeric($request['electricity_outdoor_distance_m'] ?? null)) {
+            $lines[] = 'Kabellänge: ' . (int) $request['electricity_outdoor_distance_m'] . ' m';
+        }
+        return $lines;
     }
 }

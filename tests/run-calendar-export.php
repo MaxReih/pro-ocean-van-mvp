@@ -30,7 +30,12 @@ $appointment = [
     'contact_phone' => '0123',
     'contact_email' => 'test@example.org',
 ];
-$link = (new IcsService())->googleLink($appointment, ['public_uuid' => 'OV-TEST']);
+$link = (new IcsService())->googleLink($appointment, [
+    'public_uuid' => 'OV-TEST',
+    'parking_type' => 'schoolyard',
+    'availability_window' => 'morning',
+    'electricity_outdoor_distance_m' => 15,
+]);
 $query = [];
 parse_str((string) parse_url($link, PHP_URL_QUERY), $query);
 
@@ -39,6 +44,7 @@ expect_export(($query['action'] ?? '') === 'TEMPLATE', 'Google Calendar opens a 
 expect_export(($query['dates'] ?? '') === '20260806/20260807', 'the all-day appointment uses the correct date range');
 expect_export(str_contains((string) ($query['location'] ?? ''), '73312'), 'the appointment address is included');
 expect_export(str_contains((string) ($query['details'] ?? ''), 'OV-TEST'), 'the request reference is included');
+expect_export(str_contains((string) ($query['details'] ?? ''), 'Stellplatz: Schulhof') && str_contains((string) ($query['details'] ?? ''), 'Kabellänge: 15 m'), 'the export includes useful onsite planning details');
 
 $publicLink = (new IcsService())->googlePublicEventLink([
     'calendar_date' => '2026-08-08',

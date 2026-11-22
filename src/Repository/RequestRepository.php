@@ -49,6 +49,9 @@ final class RequestRepository
             'school_needs' => sanitize_textarea_field((string) ($payload['school_needs'] ?? '')),
             'school_schedule_notes' => sanitize_textarea_field((string) ($payload['school_schedule_notes'] ?? '')),
             'school_lesson_duration' => $this->allowedValue($payload['school_lesson_duration'] ?? '', ['45', '60', '90']),
+            'school_support' => $this->allowedValue($payload['school_support'] ?? '', ['yes', 'no']),
+            'school_support_amount' => ($payload['school_support'] ?? '') === 'yes' && is_numeric($payload['school_support_amount'] ?? null) ? (float) $payload['school_support_amount'] : null,
+            'school_support_note' => ($payload['school_support'] ?? '') === 'yes' ? sanitize_text_field((string) ($payload['school_support_note'] ?? '')) : '',
             'event_child_age_range' => sanitize_text_field((string) ($payload['event_child_age_range'] ?? '')),
             'occasion_description' => sanitize_textarea_field((string) ($payload['occasion_description'] ?? '')),
             'availability_window' => $this->allowedValue($payload['availability_window'] ?? '', ['morning', 'afternoon', 'full_day']),
@@ -256,6 +259,26 @@ final class RequestRepository
         $mode = ($data['request_mode'] ?? '') === 'specific_date' ? 'specific_date' : 'date_range';
         $children = max(0, (int) ($data['children_count'] ?? 0));
         $adults = max(0, (int) ($data['adult_count'] ?? 0));
+        $existingClasses = (array) ($request['classes'] ?? []);
+        $detailed = isset($existingClasses[0]['children']);
+        $updatedClasses = [];
+        if ($detailed && isset($data['detail_classes'])) {
+            $updatedClasses = \ProOceanVan\Domain\SchoolClasses::normalize((array) $data['detail_classes'], range(1, 13));
+            if (! $updatedClasses || count($updatedClasses) !== count($existingClasses)) {
+                return false;
+            }
+        }
+        if ($detailed) {
+            $rows = $updatedClasses ?: $existingClasses;
+            $children = array_sum(array_column($rows, 'children'));
+            $adults = array_sum(array_column($rows, 'teachers')) + array_sum(array_column($rows, 'adults'));
+            $data['school_class_count'] = count($rows);
+        }
+        $support = $this->allowedValue($data['school_support'] ?? $request['school_support'] ?? '', ['yes', 'no']);
+        $amount = $data['school_support_amount'] ?? $request['school_support_amount'] ?? '';
+        if ($support === 'yes' && $amount !== '' && (! is_numeric($amount) || (float) $amount < 0 || (float) $amount > 100000)) {
+            return false;
+        }
         $total = $children + $adults;
         if ($total <= 0) {
             return false;
@@ -297,6 +320,9 @@ final class RequestRepository
             'school_needs' => sanitize_textarea_field((string) ($data['school_needs'] ?? '')),
             'school_schedule_notes' => sanitize_textarea_field((string) ($data['school_schedule_notes'] ?? '')),
             'school_lesson_duration' => $this->allowedValue($data['school_lesson_duration'] ?? '', ['45', '60', '90']),
+            'school_support' => $support,
+            'school_support_amount' => $support === 'yes' && $amount !== '' ? round((float) $amount, 2) : null,
+            'school_support_note' => $support === 'yes' ? sanitize_text_field((string) ($data['school_support_note'] ?? $request['school_support_note'] ?? '')) : '',
             'event_child_age_range' => sanitize_text_field((string) ($data['event_child_age_range'] ?? '')),
             'occasion_description' => sanitize_textarea_field((string) ($data['occasion_description'] ?? '')),
             'availability_window' => $this->allowedValue($data['availability_window'] ?? '', ['morning', 'afternoon', 'full_day']),
@@ -334,8 +360,12 @@ final class RequestRepository
             return false;
         }
         $classes = new ClassRepository();
-        $classes->updateFirstName($id, sanitize_text_field((string) ($data['target_group'] ?? '')));
-        $classes->syncParticipantTotal($id, $total);
+        if ($updatedClasses) {
+            $classes->replaceForRequest($id, $updatedClasses);
+        } elseif (! $detailed) {
+            $classes->updateFirstName($id, sanitize_text_field((string) ($data['target_group'] ?? '')));
+            $classes->syncParticipantTotal($id, $total);
+        }
         return true;
     }
 
@@ -389,6 +419,9 @@ final class RequestRepository
             'general_notes' => '',
             'school_needs' => '',
             'school_schedule_notes' => '',
+            'school_support' => null,
+            'school_support_amount' => null,
+            'school_support_note' => '',
             'natural_water_location' => '',
             'event_child_age_range' => '',
             'occasion_description' => '',

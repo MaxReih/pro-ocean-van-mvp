@@ -23,7 +23,8 @@ final class Shortcode
         }
 
         wp_enqueue_script('pov-frontend');
-        $states = (new StateRepository())->all(true);
+        $states = (new StateRepository())->all();
+        $tourWindows = (new \ProOceanVan\Service\SeasonalStateService())->all();
         ob_start();
         include POV_PLUGIN_DIR . 'templates/frontend-booking.php';
         return (string) ob_get_clean();

@@ -119,7 +119,7 @@ $initial = Invoke-BrowserExpression -Expression @'
 }))()
 '@
 
-if ($initial.headline -ne 'Hol das Meer zu dir' -or -not $initial.calendarVisible -or -not $initial.publicEventLabel) {
+if ($initial.headline -ne 'Bringt das Meer zu dir' -or -not $initial.calendarVisible -or -not $initial.publicEventLabel) {
     throw "Kalenderpruefung fehlgeschlagen: $($initial | ConvertTo-Json -Compress)"
 }
 
@@ -139,12 +139,10 @@ Wait-BrowserExpression -Expression 'document.querySelector("[data-action=check-r
 
 Invoke-BrowserExpression -Expression @'
 (() => {
-    const days = Array.from(document.querySelectorAll('.pov-day:not(:disabled)'))
-        .filter((day) => day.dataset.state !== 'walk_in');
-    if (!days.length) throw new Error('Kein auswählbarer Kalendertag');
-    days[0].click();
-    if (days[1]) days[1].click();
-    document.querySelector('[data-action="confirm-calendar-selection"]').click();
+    const recommendation = document.querySelector('.pov-suggestion.is-best button');
+    if (!recommendation) throw new Error('Kein Routenvorschlag für die Test-PLZ');
+    recommendation.click();
+    document.querySelector('[data-action="confirm-date"]').click();
     return true;
 })()
 '@ | Out-Null
@@ -167,11 +165,7 @@ Invoke-BrowserExpression -Expression @'
         city: 'T\u00fcbingen',
         postal_code: '72072',
         state_code: 'BW',
-        school_grade: 'grade_5',
         school_class_count: '2',
-        school_teachers_per_class: '1',
-        school_children_per_class: '20',
-        school_adult_count: '1',
         school_needs: 'Zwei Klassen, barrierefreier Zugang erforderlich.'
     };
     Object.entries(values).forEach(([name, value]) => {
@@ -179,6 +173,14 @@ Invoke-BrowserExpression -Expression @'
         field.value = value;
         field.dispatchEvent(new Event('change', { bubbles: true }));
         field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    form.querySelectorAll('.pov-school-class:not([hidden])').forEach((row, index) => {
+        const grade = row.querySelector('[data-class-field="grade"]');
+        grade.selectedIndex = 1;
+        row.querySelector('[data-class-field="children"]').value = '20';
+        const teachers = row.querySelector('[data-class-field="teachers"]');
+        teachers.value = index === 0 ? '1' : '0';
+        teachers.dispatchEvent(new Event('input', { bubbles: true }));
     });
     document.querySelector('[data-event-section="Schule"]').scrollIntoView({ block: 'center' });
     return true;
@@ -189,7 +191,7 @@ $school = Invoke-BrowserExpression -Expression @'
 (() => ({
     schoolVisible: !document.querySelector('[data-event-section="Schule"]')?.hidden,
     eventHidden: document.querySelector('[data-event-section="Veranstaltung"]')?.hidden,
-    otherHidden: document.querySelector('[data-event-section="Sonstiges"]')?.hidden,
+    otherHidden: document.querySelector('[data-event-section~="Sonstiges"]')?.hidden,
     participantTotal: document.querySelector('[name="participant_total"]')?.value
 }))()
 '@
@@ -224,7 +226,7 @@ Invoke-BrowserExpression -Expression @'
     return true;
 })()
 '@ | Out-Null
-$other = Invoke-BrowserExpression -Expression '(() => ({otherVisible: !document.querySelector("[data-event-section=Sonstiges]")?.hidden, occasionEnabled: !document.querySelector("[name=occasion_description]")?.disabled, participantTotal: document.querySelector("[name=participant_total]")?.value}))()'
+$other = Invoke-BrowserExpression -Expression '(() => ({otherVisible: !document.querySelector("[data-event-section~=Sonstiges]")?.hidden, occasionEnabled: !document.querySelector("[name=occasion_description]")?.disabled, participantTotal: document.querySelector("[name=participant_total]")?.value}))()'
 if (-not $other.otherVisible -or -not $other.occasionEnabled -or $other.participantTotal -ne '1') {
     throw "Sonstiges-Dynamik fehlgeschlagen: $($other | ConvertTo-Json -Compress)"
 }

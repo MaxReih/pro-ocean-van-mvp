@@ -222,7 +222,8 @@ final class PublicSuggestionResponseService
         }
 
         $day = new DateTimeImmutable($date, wp_timezone());
-        if ($day < new DateTimeImmutable('today', wp_timezone()) || (int) $day->format('N') >= 6) {
+        $weekday = strtolower($day->format('D'));
+        if (! (new AvailabilityService())->requestableDates((string) ($request['state_code'] ?? ''), $date, $date, [$weekday])) {
             return false;
         }
 
@@ -237,7 +238,7 @@ final class PublicSuggestionResponseService
         }
 
         $weekdays = array_filter(explode(',', (string) ($request['possible_weekdays'] ?? '')));
-        return ! $weekdays || in_array(strtolower($day->format('D')), $weekdays, true);
+        return ! $weekdays || in_array($weekday, $weekdays, true);
     }
 
     private function validDate(string $date): bool

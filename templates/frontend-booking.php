@@ -7,6 +7,10 @@ if (! defined('ABSPATH')) {
 }
 
 $privacy = (string) get_option('pov_privacy_page_url', '');
+$contact = (string) get_option('pov_public_contact_url', '') ?: 'https://www.pro-ocean.com/';
+$activeStates = array_filter($states, static fn (array $state): bool => ! empty($state['is_active']));
+$stateNames = array_column($activeStates, 'state_name', 'state_code');
+$schoolGrades = \ProOceanVan\Domain\SchoolClasses::configuredGrades();
 ?>
 <section class="pov-booking" data-pov-booking data-started-at="<?php echo esc_attr((string) time()); ?>" aria-labelledby="pov-booking-title">
     <header class="pov-hero">
@@ -15,7 +19,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
         </a>
         <div>
             <span class="pov-kicker">Ocean Van</span>
-            <h1 id="pov-booking-title">Hol das Meer zu dir</h1>
+            <h1 id="pov-booking-title">Bringt das Meer zu dir</h1>
         </div>
     </header>
 
@@ -30,7 +34,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     <select id="pov-state-code" data-field="state_code" required autocomplete="address-level1">
                         <option value="">Bitte auswählen</option>
                         <?php foreach ($states as $state) : ?>
-                            <option value="<?php echo esc_attr($state['state_code']); ?>"><?php echo esc_html($state['state_name']); ?></option>
+                            <option value="<?php echo esc_attr($state['state_code']); ?>" data-active="<?php echo empty($state['is_active']) ? '0' : '1'; ?>"><?php echo esc_html($state['state_name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -42,35 +46,54 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </button>
             </div>
             <div class="pov-live pov-route-status" role="status" aria-live="polite" data-role="route-status"></div>
+            <p data-role="region-contact" hidden>In diesem Bundesland sind derzeit keine Buchungsanfragen möglich. <a href="<?php echo esc_url($contact); ?>">Kontakt zu Pro Ocean</a></p>
 
-            <section class="pov-recommendations" aria-labelledby="pov-recommendation-title">
-                <div class="pov-subheading">
-                    <strong id="pov-recommendation-title" class="pov-section-title">Unsere Terminvorschläge</strong>
+            <section class="pov-option-panel pov-date-request" aria-labelledby="pov-date-request-title" data-role="date-request" hidden>
+                <h3 id="pov-date-request-title">Wunschtermin</h3>
+                <div class="pov-suggestions" data-role="suggestions" aria-live="polite" aria-busy="false"></div>
+                <label>Terminart
+                    <select data-role="date-mode"><option value="single">Einzeltag</option><option value="range">Zeitraum</option></select>
+                </label>
+                <div class="pov-grid-2">
+                    <label><span data-role="date-from-label">Datum</span><input type="date" data-role="date-from"></label>
+                    <label data-role="date-to-wrap" hidden>Bis<input type="date" data-role="date-to"></label>
                 </div>
-                <div class="pov-suggestions" data-role="suggestions" aria-live="polite" aria-busy="false">
-                    <div class="pov-empty-state">
-                        <strong>Ort eingeben</strong>
+                <fieldset class="pov-choice-fieldset" data-role="preferred-weekdays" hidden>
+                    <legend>Mögliche Wochentage</legend>
+                    <div class="pov-checklist">
+                        <label><input type="checkbox" data-weekday="all" checked><span>Keine Präferenz</span></label>
+                        <?php foreach (['mon' => 'Mo', 'tue' => 'Di', 'wed' => 'Mi', 'thu' => 'Do', 'fri' => 'Fr', 'sat' => 'Sa', 'sun' => 'So'] as $day => $name) : ?>
+                            <label><input type="checkbox" data-weekday="<?php echo esc_attr($day); ?>"><span><?php echo esc_html($name); ?></span></label>
+                        <?php endforeach; ?>
                     </div>
-                </div>
+                </fieldset>
+                <div class="pov-live" role="status" aria-live="polite" data-role="date-status"></div>
+                <button type="button" class="pov-button" data-action="confirm-date">Weiter <span aria-hidden="true">→</span></button>
             </section>
 
             <section class="pov-option-panel" id="pov-calendar-panel" data-role="calendar-panel" aria-labelledby="pov-calendar-title">
+                <h3>Tourkalender</h3>
                 <div class="pov-calendar-toolbar">
                     <button type="button" class="pov-icon-button" data-action="prev-month" aria-label="Vorheriger Monat">‹</button>
                     <h3 id="pov-calendar-title" data-role="month-label" tabindex="-1"></h3>
                     <button type="button" class="pov-icon-button" data-action="next-month" aria-label="Nächster Monat">›</button>
                 </div>
                 <div class="pov-live pov-calendar-status" role="status" aria-live="polite" data-role="calendar-status"></div>
-                <div class="pov-calendar" data-role="calendar" role="group" aria-label="Verfügbare Besuchstage" aria-busy="false"></div>
-                <p class="pov-calendar-note">Einzeltermine oder Zeiträume anfragbar</p>
-                <div class="pov-calendar-actions" data-role="calendar-selection" hidden>
-                    <button type="button" class="pov-button" data-action="confirm-calendar-selection">Weiter <span aria-hidden="true">→</span></button>
-                </div>
+                <div class="pov-calendar" data-role="calendar" role="group" aria-label="Tourübersicht und öffentliche Events" aria-busy="false"></div>
                 <div class="pov-legend" aria-label="Kalenderlegende">
-                    <span><i class="is-tour"></i>Van unterwegs</span>
+                    <span><i class="is-tour"></i>Bestätigter Tourstopp</span>
                     <span><i class="is-walk-in"></i>Öffentliches Event</span>
                     <span><i class="is-unavailable"></i>Nicht buchbar</span>
                 </div>
+                <?php
+                $upcomingWindows = array_filter($tourWindows, static fn (array $window): bool => ($window['to'] ?? '') >= current_time('Y-m-d') && array_intersect((array) ($window['states'] ?? []), array_keys($stateNames)));
+                if ($upcomingWindows) : ?>
+                    <details class="pov-tour-outlook"><summary>Geplante Tourregionen</summary><ul>
+                        <?php foreach (array_slice($upcomingWindows, 0, 8) as $window) : ?>
+                            <li><?php echo esc_html(\ProOceanVan\Service\GermanDateFormatter::short((string) $window['from']) . ' – ' . \ProOceanVan\Service\GermanDateFormatter::short((string) $window['to']) . ': ' . implode(', ', array_intersect_key($stateNames, array_flip($window['states'])))); ?></li>
+                        <?php endforeach; ?>
+                    </ul></details>
+                <?php endif; ?>
             </section>
         </div>
     </section>
@@ -80,7 +103,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
 
         <div class="pov-form-topline">
             <button type="button" class="pov-back-button" data-action="back-route">← Termin ändern</button>
-            <span class="pov-region-summary"><strong data-role="selected-date-summary">Noch offen</strong></span>
+            <span class="pov-region-summary"><small>Terminwunsch</small><strong data-role="selected-date-summary">Noch offen</strong></span>
         </div>
 
         <nav class="pov-progress" aria-label="Anfragefortschritt">
@@ -100,7 +123,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                     <select name="institution_type" required>
                         <option value="">Bitte auswählen</option>
                         <option value="Schule">Schule (kostenlos)</option>
-                        <option value="Veranstaltung">Veranstaltung (ggf. kostenpflichtig)</option>
+                        <option value="Veranstaltung">Öffentliche Veranstaltung / Event (ggf. kostenpflichtig)</option>
+                        <option value="Unternehmen">Unternehmen</option>
                         <option value="Sonstiges">Sonstiges</option>
                     </select>
                 </label>
@@ -137,7 +161,7 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 <label>Bundesland
                     <select name="state_code" required autocomplete="address-level1">
                         <option value="">Bitte auswählen</option>
-                        <?php foreach ($states as $state) : ?>
+                        <?php foreach ($activeStates as $state) : ?>
                             <option value="<?php echo esc_attr($state['state_code']); ?>"><?php echo esc_html($state['state_name']); ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -146,36 +170,36 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
 
             <section class="pov-type-section" data-event-section="Schule" hidden>
                 <h2>Schule</h2>
-                <div class="pov-grid-2">
-                    <label>Klassenstufe / Alter
-                        <select name="school_grade" data-type-required>
-                            <option value="">Bitte auswählen</option>
-                            <?php
-                            $schoolGrades = array_filter(array_map('trim', explode(',', (string) get_option('pov_school_grade_options', '3,4'))));
-                            $schoolGrades = array_values(array_filter($schoolGrades, static fn (string $grade): bool => ctype_digit($grade) && (int) $grade >= 1 && (int) $grade <= 13));
-                            $schoolGrades = $schoolGrades ?: ['3', '4'];
-                            foreach ($schoolGrades as $grade) :
-                            ?>
-                                <option value="grade_<?php echo esc_attr((string) $grade); ?>"><?php echo esc_html((string) $grade . '. Klasse'); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
-                    <label>Anzahl Klassen
-                        <input type="number" name="school_class_count" min="1" max="50" step="1" inputmode="numeric" value="1" data-type-required>
-                    </label>
-                    <label>Lehrpersonal je Klasse
-                        <input type="number" name="school_teachers_per_class" min="0" max="20" step="1" inputmode="numeric" value="1" data-type-required>
-                    </label>
-                    <label>Teilnehmende Kinder / Klasse
-                        <input type="number" name="school_children_per_class" min="1" max="100" step="1" inputmode="numeric" value="25" data-type-required data-participant-field>
-                    </label>
-                    <label>Teilnehmende Erwachsene
-                        <input type="number" name="school_adult_count" min="0" max="500" step="1" inputmode="numeric" value="1" data-type-required data-participant-field>
-                    </label>
-                    <label class="pov-span-2">Mehrere Klassen oder besondere Anforderungen
-                        <textarea name="school_needs" placeholder="Optional: Klassenaufteilung, Barrierefreiheit oder weitere Needs"></textarea>
-                    </label>
+                <label>Anzahl Klassen
+                    <input type="number" name="school_class_count" min="1" max="10" step="1" inputmode="numeric" value="1" data-type-required>
+                </label>
+                <div class="pov-school-classes" data-role="school-classes"></div>
+                <template data-role="school-class-template">
+                    <fieldset class="pov-school-class">
+                        <legend>Klasse</legend><div class="pov-grid-2">
+                            <label>Klassenstufe
+                                <select data-class-field="grade" data-type-required>
+                                    <option value="">Bitte auswählen</option>
+                                    <?php foreach ($schoolGrades as $grade) : ?>
+                                        <option value="<?php echo esc_attr((string) $grade); ?>"><?php echo esc_html((string) $grade . '. Klasse'); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label>Teilnehmende Kinder<input type="number" data-class-field="children" min="1" max="100" value="25" data-type-required></label>
+                            <label>Lehrpersonal<input type="number" data-class-field="teachers" min="0" max="20" value="1" data-type-required></label>
+                            <label>Weitere Erwachsene<input type="number" data-class-field="adults" min="0" max="100" value="0" data-type-required></label>
+                        </div>
+                    </fieldset>
+                </template>
+                <label>Besondere Anforderungen <textarea name="school_needs" maxlength="5000"></textarea></label>
+                <label>Kann eure Schule oder euer Förderverein den Besuch finanziell unterstützen? <small>(freiwillig)</small>
+                    <select name="school_support"><option value="">Keine Angabe</option><option value="yes">Ja</option><option value="no">Nein</option></select>
+                </label>
+                <div class="pov-grid-2" data-role="school-support-details" hidden>
+                    <label>Betrag pro Klasse in Euro (unverbindlich)<input type="number" name="school_support_amount" min="0" max="100000" step="0.01" disabled></label>
+                    <label>Kommentar <input name="school_support_note" maxlength="500" disabled></label>
                 </div>
+                <p><small><em>Finanzielle Unterstützung ist keine Voraussetzung für einen Schulbesuch, hilft uns jedoch, das Bildungsangebot langfristig aufrechtzuerhalten und möglichst vielen Schulen zugänglich zu machen.</em></small></p>
             </section>
 
             <section class="pov-type-section" data-event-section="Veranstaltung" hidden>
@@ -193,8 +217,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                 </div>
             </section>
 
-            <section class="pov-type-section" data-event-section="Sonstiges" hidden>
-                <h2>Sonstiges</h2>
+            <section class="pov-type-section" data-event-section="Sonstiges Unternehmen" hidden>
+                <h2>Angaben zum Einsatz</h2>
                 <div class="pov-grid-2">
                     <label class="pov-span-2">Veranstaltungsart oder Anlass
                         <textarea name="occasion_description" data-type-required placeholder="Beschreibt kurz, was geplant ist."></textarea>
@@ -235,8 +259,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
                             <option value="full_day">Ganztägig</option>
                         </select>
                     </label>
-                    <label data-event-section="Schule" hidden>Hinweise / Wünsche zur zeitlichen Planung
-                        <textarea name="school_schedule_notes" placeholder="z. B. Unterrichtszeiten, Pausen oder besondere Zeitfenster"></textarea>
+                    <label data-event-section="Schule" hidden>Unterrichts- und Pausenzeiten
+                        <textarea name="school_schedule_notes" data-type-required maxlength="5000" placeholder="Bitte Zeiten angeben oder „wird nachgereicht“ eintragen."></textarea>
                     </label>
                     <label data-event-section="Schule" hidden>Dauer einer Unterrichtseinheit
                         <select name="school_lesson_duration" data-type-required>
@@ -321,9 +345,8 @@ $privacy = (string) get_option('pov_privacy_page_url', '');
             </div>
 
             <section class="pov-detail-block pov-parking-block">
-                <h2>Van-Stellplatz
-                    <span class="pov-info-tip" tabindex="0" aria-label="Maße und Gewicht des Ocean Vans">i<span role="tooltip">Länge: 6 m, Breite: 2,05 m, Höhe: 2,522 m; je nach Beladung 2,5–3,5 Tonnen.</span></span>
-                </h2>
+                <h2>Van-Stellplatz</h2>
+                <p class="pov-planning-note">Länge: 6 m, Breite: 2,05 m, Höhe: 2,522 m. Gewicht: 2,5–3,5 t je nach Beladung.</p>
                 <div class="pov-grid-2">
                     <label>Art des Stellplatzes
                         <select name="parking_type" required>

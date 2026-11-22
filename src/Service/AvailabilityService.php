@@ -13,6 +13,48 @@ use ProOceanVan\Repository\CalendarDayRepository;
 
 final class AvailabilityService
 {
+    private const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+    public function requestableDates(string $state, string $from, string $to, array $weekdays): array
+    {
+        if (! $this->validDate($from) || ! $this->validDate($to) || $from > $to || ! $weekdays) {
+            return [];
+        }
+        $today = new DateTimeImmutable('today', wp_timezone());
+        $start = new DateTimeImmutable($from, wp_timezone());
+        $end = new DateTimeImmutable($to, wp_timezone());
+        if ($start < $today || $end > $today->modify('+18 months') || (int) $start->diff($end)->days >= 180) {
+            return [];
+        }
+
+        $weekStart = $start->modify('monday this week');
+        $weekEnd = $end->modify('sunday this week');
+        $days = (new CalendarDayRepository())->forRange($weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d'));
+        $appointments = (new AppointmentRepository())->forRange($weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d'));
+        $seasons = new SeasonalStateService();
+        $dates = [];
+        $openWeeks = [];
+        foreach (new DatePeriod($weekStart, new DateInterval('P1D'), $weekEnd->modify('+1 day')) as $day) {
+            $date = $day->format('Y-m-d');
+            $status = (string) ($days[$date]['availability_state'] ?? CalendarState::AVAILABLE);
+            if ($day < $today || isset($appointments[$date]) || in_array($status, [CalendarState::UNAVAILABLE, CalendarState::WALK_IN], true)
+                || ($state !== '' && ! $seasons->allows($state, $date))) {
+                continue;
+            }
+            $weekday = (int) $day->format('N');
+            $week = $day->format('o-W');
+            if ($weekday <= 5) {
+                $openWeeks[$week] = true;
+            } elseif ($status !== CalendarState::LIMITED && empty($openWeeks[$week])) {
+                continue;
+            }
+            if ($date >= $from && $date <= $to && in_array(self::WEEKDAYS[$weekday - 1], $weekdays, true)) {
+                $dates[] = $date;
+            }
+        }
+        return $dates;
+    }
+
     public function publicCalendar(string $start, string $end): array
     {
         if (! $this->validDate($start) || ! $this->validDate($end) || $start > $end) {
@@ -29,6 +71,7 @@ final class AvailabilityService
         $appointments = (new AppointmentRepository())->forRange($start, $end);
         $period = new DatePeriod($startDate, new DateInterval('P1D'), $endDate->modify('+1 day'));
         $today = new DateTimeImmutable('today', wp_timezone());
+        $openWeekends = array_fill_keys($this->requestableDates('', max($start, $today->format('Y-m-d')), $end, ['sat', 'sun']), true);
         $result = [];
 
         foreach ($period as $day) {
@@ -81,7 +124,7 @@ final class AvailabilityService
 
             $state = $row ? (string) $row['availability_state'] : CalendarState::AVAILABLE;
             if ($isWeekend && $state === CalendarState::AVAILABLE) {
-                $state = CalendarState::LIMITED;
+                $state = isset($openWeekends[$date]) ? CalendarState::LIMITED : CalendarState::UNAVAILABLE;
             }
             $result[] = [
                 'date' => $date,

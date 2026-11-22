@@ -7,7 +7,7 @@
   --pov-blue: #135476;
   --pov-green: #1F5C4B;
   --pov-mint: #E4F3EA;
-  --pov-walk-in: #E9823A;
+  --pov-walk-in: #823A83;
   --pov-white: #fff;
   --pov-radius-sm: 10px;
   --pov-radius: 16px;
@@ -186,7 +186,8 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   text-transform: uppercase;
 }
 
-.pov-hero h1 {
+.pov-booking .pov-hero h1 {
+  color: var(--pov-ink);
   max-width: 760px;
   margin-bottom: 10px;
   font-size: clamp(2.15rem, 5.4vw, 4.25rem);
@@ -671,23 +672,24 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   display: block;
   margin-top: 3px;
   font-size: .58rem;
+  overflow-wrap: anywhere;
 }
 
 .pov-day[data-state="available"] {
-  color: var(--pov-ink);
-  background: var(--pov-white);
-  border-color: var(--pov-mist);
+  color: #12392b;
+  background: #c6e6d6;
+  border-color: #78ad95;
 }
 
 .pov-day[data-state="limited"] {
   color: var(--pov-ink);
-  background: var(--pov-sand);
+  background: #fbf0d4;
   border-color: var(--pov-sand);
 }
 
 .pov-day[data-weekend="true"][data-requestable="true"] {
   color: var(--pov-ink);
-  background: var(--pov-sand);
+  background: #fbf0d4;
   border-color: #dfbd6f;
 }
 
@@ -742,10 +744,46 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 }
 
 .pov-day[data-recommended="true"] {
-  color: var(--pov-green);
-  background: var(--pov-mint);
-  border-color: #75ad8e;
-  box-shadow: inset 0 0 0 1px #75ad8e;
+  color: white;
+  background: #205b46;
+  border-color: #205b46;
+}
+
+.pov-day[role="group"] {
+  cursor: default;
+}
+
+.pov-date-request,
+.pov-school-classes {
+  display: grid;
+  gap: 14px;
+}
+
+.pov-date-request > .pov-button {
+  justify-self: start;
+}
+
+.pov-tour-outlook {
+  margin-top: 14px;
+}
+
+.pov-school-class {
+  min-width: 0;
+  border: 1px solid var(--pov-mist);
+  border-radius: var(--pov-radius-sm);
+  padding: 12px;
+}
+
+.pov-form .pov-region-summary {
+  display: grid;
+  gap: 2px;
+  background: var(--pov-ice);
+  padding: 8px 12px;
+  border-radius: var(--pov-radius-sm);
+}
+
+.pov-form .pov-region-summary strong {
+  font-size: 1rem;
 }
 
 .pov-calendar-actions {

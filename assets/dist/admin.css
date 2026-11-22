@@ -270,10 +270,14 @@
 .pov-admin-calendar-head { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-bottom: 13px; }
 .pov-admin-calendar-head h2 { text-align: center; text-transform: capitalize; }
 .pov-admin-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
-.pov-admin-calendar-cell { position: relative; min-width: 0; min-height: 104px; }
-.pov-admin-calendar-cell > .pov-admin-calendar-day { height: 100%; padding-bottom: 25px; }
-.pov-calendar-request-link { position: absolute; right: 7px; bottom: 6px; left: 7px; overflow: hidden; color: var(--pov-blue); font-size: 9px; font-weight: 800; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.pov-admin-calendar-day.is-confirmed + .pov-calendar-request-link { color: #fff; }
+.pov-admin-calendar-cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: 104px; }
+.pov-admin-calendar-cell > .pov-admin-calendar-day { flex: 1; }
+.pov-calendar-request-link,
+.pov-calendar-day-links summary { display: block; padding: 4px; color: var(--pov-blue); font-size: .72rem; font-weight: 700; overflow-wrap: anywhere; }
+.pov-calendar-day-links summary { display: list-item; cursor: pointer; }
+.pov-calendar-request-link { text-decoration: underline; }
+.pov-admin .pov-proposal-choices label { display: flex; align-items: center; gap: 8px; }
+.pov-admin .pov-proposal-choices input[type="checkbox"] { width: auto; min-height: 0; margin: 0; }
 .pov-state-windows { margin-top: 16px; }
 .pov-state-windows > p { color: var(--pov-muted); }
 .pov-state-window-list { display: grid; gap: 8px; margin: 16px 0; }

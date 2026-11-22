@@ -44,22 +44,21 @@ final class InternalSuggestionService
             $requestId
         );
         $weekdays = array_filter(explode(',', (string) ($request['possible_weekdays'] ?? '')));
+        $eligible = array_fill_keys((new AvailabilityService())->requestableDates(
+            (string) ($request['state_code'] ?? ''),
+            max($from, current_time('Y-m-d')),
+            $to,
+            $weekdays ?: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        ), true);
         $suggestions = [];
         $comparisonCache = [];
-        $today = (new DateTimeImmutable('today'))->format('Y-m-d');
 
         foreach (new DatePeriod(new DateTimeImmutable($from), new DateInterval('P1D'), (new DateTimeImmutable($to))->modify('+1 day')) as $day) {
             $date = $day->format('Y-m-d');
-            if ($date < $today || (int) $day->format('N') >= 6 || isset($appointments[$date])) {
+            if (! isset($eligible[$date])) {
                 continue;
             }
-            if ($weekdays && ! in_array(strtolower($day->format('D')), $weekdays, true)) {
-                continue;
-            }
-            $calendarState = (string) ($calendar[$date]['availability_state'] ?? 'available');
-            if ($calendarState === 'unavailable') {
-                continue;
-            }
+            $calendarState = (int) $day->format('N') >= 6 ? 'limited' : (string) ($calendar[$date]['availability_state'] ?? 'available');
 
             $depot = $this->startPoint($calendar[$date] ?? null);
             $week = $day->format('o-W');

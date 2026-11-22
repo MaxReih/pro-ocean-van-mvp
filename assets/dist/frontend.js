@@ -18,6 +18,13 @@
   const suggestionsElement = $('[data-role="suggestions"]');
   const calendarElement = $('[data-role="calendar"]');
 
+  const dateRequest = $('[data-role="date-request"]');
+  const dateMode = $('[data-role="date-mode"]');
+  const dateFrom = $('[data-role="date-from"]');
+  const dateTo = $('[data-role="date-to"]');
+  const dateStatus = $('[data-role="date-status"]');
+  const dateNext = $('[data-action="confirm-date"]');
+  const weekdayCodes = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   routeStatus.id = 'pov-route-status';
 
   const today = new Date();
@@ -39,9 +46,6 @@
     selectedDate: '',
     rangeFrom: '',
     rangeTo: '',
-    pendingCalendarStart: '',
-    pendingCalendarEnd: '',
-    pendingCalendarHasEnd: false,
     possibleWeekdays: ['mon', 'tue', 'wed', 'thu', 'fri'],
     mode: 'date_range',
     step: 1,
@@ -63,14 +67,9 @@
 
   const calendar = new window.POVCalendar(calendarElement, {
     initialMonth: state.month,
-    onSelect: function (date) {
-      stageCalendarDate(date);
-    },
+    overview: true,
     onDetails: function (date, row) {
       openWalkIn(date, row);
-    },
-    onRequest: function (date) {
-      stageCalendarDate(date);
     }
   });
 
@@ -114,6 +113,17 @@
     return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   }
 
+  function endpoint(path, query = {}) {
+    const url = new URL(api, window.location.href);
+    if (url.searchParams.has('rest_route')) {
+      url.searchParams.set('rest_route', url.searchParams.get('rest_route').replace(/\/?$/, '/') + path);
+    } else {
+      url.pathname = url.pathname.replace(/\/?$/, '/') + path;
+    }
+    new URLSearchParams(query).forEach((value, key) => url.searchParams.set(key, value));
+    return url;
+  }
+
   function routeRegionValues() {
     return {
       postal: $('[data-field="postal_code"]').value.trim(),
@@ -143,7 +153,7 @@
   function setRouteLoading(loading) {
     const button = $('[data-action="check-route"]');
     const label = button.querySelector('span:first-child');
-    button.disabled = loading;
+    button.disabled = loading || $('[data-field="state_code"]').selectedOptions[0]?.dataset.active === '0';
     button.classList.toggle('is-loading', loading);
     button.setAttribute('aria-busy', loading ? 'true' : 'false');
     suggestionsElement.setAttribute('aria-busy', loading ? 'true' : 'false');
@@ -194,12 +204,14 @@
       state.selectedDate = '';
       state.rangeFrom = '';
       state.rangeTo = '';
-      clearPendingCalendarSelection();
+      dateFrom.value = '';
+      dateTo.value = '';
+      updateDateInputs();
     }
     calendar.setRecommended([]);
-    if (typeof calendar.setSelection === 'function') calendar.setSelection('', '');
     renderCalendar();
-    renderSuggestionPlaceholder(title, text, 'warning');
+    if (title || text) renderSuggestionPlaceholder(title, text, 'warning');
+    else suggestionsElement.replaceChildren();
   }
 
   function invalidateRouteInput() {
@@ -209,23 +221,22 @@
     routeController = null;
     setRouteLoading(false);
     state.activeRegionKey = '';
-    clearRecommendations('Ort geändert', 'Bitte Route neu prüfen.', true);
+    clearRecommendations('', '', true);
   }
 
   function handleRouteRegionChange() {
     clearRouteFieldErrors();
+    const inactive = $('[data-field="state_code"]').selectedOptions[0]?.dataset.active === '0';
     const key = routeRegionKey();
-    if (state.activeRegionKey && key !== state.activeRegionKey) {
-      invalidateRouteInput();
-    } else if (!key) {
+    $('[data-role="region-contact"]').hidden = !inactive;
+    dateRequest.hidden = !key || inactive;
+    if (inactive || !key || state.activeRegionKey !== key) {
       invalidateRouteInput();
       setRouteStatus('');
-      return;
     }
-    if (!key) return;
+    if (inactive || !key) return;
 
     window.clearTimeout(routeTimer);
-    setRouteStatus('Ort erkannt – wir suchen zwei passende Tage.', 'loading');
     routeTimer = window.setTimeout(checkRoute, 650);
   }
 
@@ -246,7 +257,8 @@
 
   async function checkRoute() {
     window.clearTimeout(routeTimer);
-    if (!requireRouteRegion()) return;
+    if (!requireRouteRegion() || $('[data-field="state_code"]').selectedOptions[0]?.dataset.active === '0') return;
+    dateRequest.hidden = false;
 
     const values = routeRegionValues();
     const key = routeRegionKey();
@@ -266,7 +278,7 @@
     renderSuggestionPlaceholder('Termine kommen gleich', '', 'loading');
 
     try {
-      const response = await fetch(api + 'recommendations', {
+      const response = await fetch(endpoint('recommendations'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postal_code: values.postal, state_code: values.code }),
@@ -285,8 +297,10 @@
       state.geoFilterApplied = data.filter_applied === true;
       state.geoEligibleDates = new Set(Array.isArray(data.eligible_dates) ? data.eligible_dates : []);
       state.eligibilityToken = typeof data.eligibility_token === 'string' ? data.eligibility_token : '';
-      copyRouteRegionToForm();
-      markRouteFresh();
+      if (!routeScreen.hidden) {
+        copyRouteRegionToForm();
+        markRouteFresh();
+      }
       renderSuggestions(
         Array.isArray(data.suggestions) ? data.suggestions : [],
         Array.isArray(data.week_suggestions) ? data.week_suggestions : []
@@ -299,10 +313,12 @@
       state.geoFilterApplied = true;
       state.geoEligibleDates = new Set();
       state.eligibilityToken = '';
-      copyRouteRegionToForm();
-      markRouteFresh();
+      if (!routeScreen.hidden) {
+        copyRouteRegionToForm();
+        markRouteFresh();
+      }
       renderCalendar();
-      renderSuggestionPlaceholder('Keine Routentermine geladen', 'Bitte Zeitraum anfragen.', 'warning');
+      renderSuggestionPlaceholder('Keine Routentermine geladen', 'Ihr könnt einen Wunschtermin anfragen.', 'warning');
       setRouteStatus(requestTimedOut
         ? 'Die Routensuche dauert zu lange. Bitte Zeitraum anfragen.'
         : (error.isApiError ? error.message + ' ' : '') + 'Bitte Zeitraum anfragen.', 'error');
@@ -325,8 +341,7 @@
     suggestionsElement.innerHTML = '';
 
     if (!best.length) {
-      const rangeOnly = state.geoFilterApplied && state.geoEligibleDates.size === 0;
-      renderSuggestionPlaceholder('Kein direkter Termin verfügbar', rangeOnly ? 'Bitte Zeitraum anfragen.' : 'Kalender oder Zeitraum nutzen.', 'warning');
+      renderSuggestionPlaceholder('Keine Routenvorschläge', 'Ihr könnt einen Wunschtermin anfragen.', 'warning');
       return;
     }
 
@@ -348,11 +363,10 @@
         tag.textContent = 'Beste Routenoption';
         article.querySelector('.pov-suggestion-copy').appendChild(tag);
       }
-      button.textContent = 'Termin anfragen';
-      button.setAttribute('aria-label', formatDate(item.date) + ' anfragen');
+      button.textContent = 'Datum übernehmen';
+      button.setAttribute('aria-label', formatDate(item.date) + ' übernehmen');
       button.addEventListener('click', function () {
-        stageCalendarDate(item.date);
-        revealCalendarSelection(item.date);
+        prefillDateRequest(item.date);
       });
       article.appendChild(button);
       suggestionsElement.appendChild(article);
@@ -369,8 +383,8 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pov-secondary-button';
-      button.textContent = 'Woche anfragen';
-      button.addEventListener('click', function () { selectSuggestedWeek(week); });
+      button.textContent = 'Zeitraum übernehmen';
+button.addEventListener('click', function () { prefillDateRequest(week.date_from, week.date_to); });
       article.appendChild(button);
       suggestionsElement.appendChild(article);
     }
@@ -409,19 +423,12 @@
     calendar.setMonth(state.month);
     calendar.setRecommended(Array.from(state.recommendations));
     calendar.setRows(Array.from(state.days.values()).map(function (row) {
-      if (!state.geoFilterApplied || !row.is_selectable || state.geoEligibleDates.has(row.date)) {
-        return row;
-      }
+      const geoUnavailable = state.geoFilterApplied && row.is_selectable && !state.geoEligibleDates.has(row.date);
       return Object.assign({}, row, {
-        public_state: 'geo_unavailable',
-        public_label: 'Für diese Route nicht verfügbar',
-        is_selectable: false,
-        is_requestable: false
+        public_state: geoUnavailable ? 'geo_unavailable' : row.public_state,
+        public_label: geoUnavailable ? 'Für die Route nicht empfohlen' : row.public_label
       });
     }));
-    const selectionStart = state.pendingCalendarStart || state.selectedDate || state.rangeFrom;
-    const selectionEnd = state.pendingCalendarEnd || state.selectedDate || state.rangeTo;
-    if (typeof calendar.setSelection === 'function') calendar.setSelection(selectionStart, selectionEnd);
     updateMonthButtons();
   }
 
@@ -438,7 +445,7 @@
     renderCalendar();
 
     try {
-      const response = await fetch(api + 'calendar?start=' + bounds.start + '&end=' + bounds.end, {
+      const response = await fetch(endpoint('calendar', bounds), {
         signal: calendarController.signal
       });
       const rows = await responseData(response);
@@ -460,100 +467,76 @@
     }
   }
 
-  function ensureActiveRoute() {
-    if (state.activeRegionKey && state.activeRegionKey === routeRegionKey()) return true;
-    setRouteStatus('Bitte zuerst die Route prüfen.', 'error');
-    routeHeading.focus({ preventScroll: true });
-    routeScreen.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
-    return false;
+  function updateDateInputs() {
+    const range = dateMode.value === 'range';
+    $('[data-role="date-from-label"]').textContent = range ? 'Von' : 'Datum';
+    $('[data-role="date-to-wrap"]').hidden = !range;
+    $('[data-role="preferred-weekdays"]').hidden = !range;
+    dateTo.min = dateFrom.value || dateFrom.min;
+    dateStatus.textContent = '';
   }
 
-  function setPendingCalendarSelection(start, end, hasEnd) {
-    state.pendingCalendarStart = start;
-    state.pendingCalendarEnd = end || start;
-    state.pendingCalendarHasEnd = Boolean(hasEnd && end && end !== start);
-    renderCalendarSelection();
-    renderCalendar();
+  function prefillDateRequest(from, to) {
+    dateMode.value = to ? 'range' : 'single';
+    dateFrom.value = from;
+    dateTo.value = to || '';
+    $$('[data-weekday]', dateRequest).forEach(field => { field.checked = field.dataset.weekday === 'all'; });
+    updateDateInputs();
+    dateFrom.focus({ preventScroll: true });
+    dateRequest.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'center' });
   }
 
-  function clearPendingCalendarSelection() {
-    state.pendingCalendarStart = '';
-    state.pendingCalendarEnd = '';
-    state.pendingCalendarHasEnd = false;
-    const panel = $('[data-role="calendar-selection"]');
-    if (panel) panel.hidden = true;
+  function datePreference() {
+    const range = dateMode.value === 'range';
+    return {
+      range,
+      from: dateFrom.value,
+      to: range ? dateTo.value : dateFrom.value,
+      weekdays: !range || $('[data-weekday="all"]').checked
+        ? weekdayCodes : $$('[data-weekday]:checked', dateRequest).map(field => field.dataset.weekday)
+    };
   }
 
-  function renderCalendarSelection() {
-    const panel = $('[data-role="calendar-selection"]');
-    if (!panel) return;
-    panel.hidden = !state.pendingCalendarStart;
-  }
-
-  function stageCalendarDate(date) {
-    if (!ensureActiveRoute()) return;
-    if (!state.pendingCalendarStart || state.pendingCalendarHasEnd) {
-      setPendingCalendarSelection(date, date, false);
+  async function confirmDateRequest() {
+    if (!requireRouteRegion() || dateRequest.hidden || dateNext.disabled) return;
+    const preference = datePreference();
+    const { range, from, to, weekdays } = preference;
+    const span = (Date.parse(to) - Date.parse(from)) / 86400000;
+    if (!from || !to || !dateFrom.validity.valid || (range && !dateTo.validity.valid) || span < 0 || span >= 180 || !weekdays.length) {
+      dateStatus.textContent = 'Bitte prüft Datum und Wochentage. Ein Zeitraum darf höchstens 180 Tage umfassen.';
       return;
     }
-    if (date === state.pendingCalendarStart) {
-      setPendingCalendarSelection(date, date, false);
-      return;
-    }
-    const start = date < state.pendingCalendarStart ? date : state.pendingCalendarStart;
-    const end = date < state.pendingCalendarStart ? state.pendingCalendarStart : date;
-    setPendingCalendarSelection(start, end, true);
-  }
 
-  function revealCalendarSelection(date) {
-    const selected = new Date(date + 'T12:00:00');
-    const targetMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
-    if (targetMonth.getTime() !== state.month.getTime()) {
-      state.month = targetMonth;
-      loadCalendar();
+    const key = routeRegionKey();
+    const params = new URLSearchParams({ state_code: routeRegionValues().code, from, to, weekdays: weekdays.join(',') });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+    dateNext.disabled = true;
+    dateStatus.textContent = 'Verfügbarkeit wird geprüft …';
+    try {
+      const response = await fetch(endpoint('availability', params), { signal: controller.signal });
+      const data = await responseData(response);
+      if (!response.ok) throw new Error('availability');
+      if (key !== routeRegionKey() || JSON.stringify(preference) !== JSON.stringify(datePreference())) return;
+      if (!data.available) {
+        dateStatus.textContent = 'Für diese Auswahl ist kein Tag anfragbar. Bitte wählt ein anderes Datum oder andere Wochentage.';
+        return;
+      }
+      const routeDate = !range && state.activeRegionKey === key && state.eligibilityToken && state.geoEligibleDates.has(from);
+      state.mode = routeDate ? 'specific_date' : 'date_range';
+      state.selectedRecommendation = routeDate ? state.recommendationByDate.get(from) || null : null;
+      state.selectedDate = routeDate ? from : '';
+      state.rangeFrom = routeDate ? '' : from;
+      state.rangeTo = routeDate ? '' : to;
+      state.possibleWeekdays = routeDate ? [] : weekdays;
+      dateStatus.textContent = '';
+      openForm();
+    } catch {
+      dateStatus.textContent = 'Die Verfügbarkeit ließ sich gerade nicht prüfen. Bitte erneut versuchen.';
+    } finally {
+      window.clearTimeout(timeout);
+      dateNext.disabled = false;
     }
-    $('[data-role="calendar-panel"]').scrollIntoView({ behavior: preferredScrollBehavior(), block: 'center' });
-  }
-
-  function calendarWeekdays(start, end) {
-    const selected = new Set();
-    const cursor = new Date(start + 'T12:00:00');
-    const last = new Date(end + 'T12:00:00');
-    while (cursor <= last) {
-      selected.add(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][cursor.getDay()]);
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter(function (day) { return selected.has(day); });
-  }
-
-  function confirmCalendarSelection() {
-    if (!state.pendingCalendarStart || !ensureActiveRoute()) return;
-    const start = state.pendingCalendarStart;
-    const end = state.pendingCalendarHasEnd ? state.pendingCalendarEnd : start;
-    const weekdays = calendarWeekdays(start, end);
-    state.selectedRecommendation = start === end ? (state.recommendationByDate.get(start) || null) : null;
-    if (start === end) {
-      state.mode = 'specific_date';
-      state.selectedDate = start;
-      state.rangeFrom = '';
-      state.rangeTo = '';
-      state.possibleWeekdays = [];
-    } else {
-      state.mode = 'date_range';
-      state.selectedDate = '';
-      state.rangeFrom = start;
-      state.rangeTo = end;
-      state.possibleWeekdays = weekdays;
-    }
-    clearPendingCalendarSelection();
-    renderCalendar();
-    openForm();
-  }
-
-  function selectSuggestedWeek(week) {
-    if (!ensureActiveRoute()) return;
-    setPendingCalendarSelection(week.date_from, week.date_to, week.date_from !== week.date_to);
-    revealCalendarSelection(week.date_from);
   }
 
   function openWalkIn(date, row) {
@@ -592,6 +575,7 @@
 
   function openForm() {
     copyRouteRegionToForm();
+    markRouteFresh();
     $('[data-role="selected-date-summary"]').textContent = selectedDateLabel();
     routeScreen.hidden = true;
     form.hidden = false;
@@ -666,8 +650,10 @@
   function updateEventTypeSections() {
     const type = form.elements.institution_type.value;
     $$('[data-event-section]', form).forEach(function (section) {
-      toggleConditionalSection(section, section.dataset.eventSection === type, 'data-type-required');
+      toggleConditionalSection(section, section.dataset.eventSection.split(' ').includes(type), 'data-type-required');
     });
+    updateSchoolClasses();
+    updateSchoolSupport();
     syncParticipantTotal();
   }
 
@@ -717,8 +703,10 @@
       return !field.disabled && !field.checkValidity();
     });
     const uniqueInvalid = Array.from(new Set(invalid.filter(Boolean)));
-    if (step === 1 && Number(form.elements.participant_total.value || 0) < 1) {
-      const participantField = $('[data-participant-field]:not(:disabled)', fieldset);
+    const participantCount = Number(form.elements.participant_total.value || 0);
+    const invalidGroupSize = step === 1 && (participantCount < 1 || participantCount > 500);
+    if (invalidGroupSize) {
+      const participantField = $('[data-class-field="children"]:not(:disabled), [data-participant-field]:not(:disabled)', fieldset);
       if (participantField) uniqueInvalid.push(participantField);
     }
     if (!uniqueInvalid.length) return true;
@@ -727,7 +715,7 @@
     error.className = 'pov-error';
     error.id = 'pov-step-error-' + step;
     error.setAttribute('role', 'alert');
-    error.textContent = 'Bitte markierte Angaben prüfen.';
+    error.textContent = invalidGroupSize ? 'Bitte gebt insgesamt 1 bis 500 Teilnehmende an.' : 'Bitte markierte Angaben prüfen.';
     const actions = $('.pov-actions', fieldset);
     fieldset.insertBefore(error, actions || null);
 
@@ -832,18 +820,41 @@
     }
   }
 
-  function gradeForSchool(value) {
-    const match = String(value || '').match(/^grade_(\d+)$/);
-    return match ? Math.max(1, Math.min(6, Number(match[1]))) : 1;
+  function updateSchoolClasses() {
+    const container = $('[data-role="school-classes"]', form);
+    const count = form.elements.institution_type.value === 'Schule'
+      ? Math.max(0, Math.min(10, Number(form.elements.school_class_count.value) || 0)) : 0;
+    const template = $('[data-role="school-class-template"]', form);
+    while (container.children.length < count) {
+      const row = template.content.firstElementChild.cloneNode(true);
+      row.querySelector('legend').textContent = 'Klasse ' + (container.children.length + 1);
+      container.appendChild(row);
+    }
+    Array.from(container.children).forEach((row, index) => toggleConditionalSection(row, index < count, 'data-type-required'));
+  }
+
+  function updateSchoolSupport() {
+    toggleConditionalSection($('[data-role="school-support-details"]', form), form.elements.institution_type.value === 'Schule' &&
+      form.elements.school_support.value === 'yes', 'data-type-required');
+  }
+
+  function schoolClasses() {
+    return $$('.pov-school-class:not([hidden])', form).map((row, index) => {
+      const value = name => Number($('[data-class-field="' + name + '"]', row).value);
+      const children = value('children');
+      const teachers = value('teachers');
+      const adults = value('adults');
+      return { class_name: 'Klasse ' + (index + 1), grade: value('grade'), children, teachers, adults, participant_count: children + teachers + adults };
+    });
   }
 
   function participantCounts() {
     const type = form.elements.institution_type.value;
     if (type === 'Schule') {
-      const classCount = Math.max(0, Number(form.elements.school_class_count.value || 0));
-      const childrenPerClass = Math.max(0, Number(form.elements.school_children_per_class.value || 0));
-      const adults = Math.max(0, Number(form.elements.school_adult_count.value || 0));
-      return { children: classCount * childrenPerClass, adults: adults };
+      return schoolClasses().reduce((total, row) => ({
+        children: total.children + row.children,
+        adults: total.adults + row.teachers + row.adults
+      }), { children: 0, adults: 0 });
     }
     if (type === 'Veranstaltung') {
       const children = Math.max(0, Number(form.elements.event_children_count.value || 0));
@@ -854,7 +865,7 @@
       };
     }
     form.elements.event_child_age_range.required = false;
-    if (type === 'Sonstiges') {
+    if (type === 'Sonstiges' || type === 'Unternehmen') {
       return {
         children: Math.max(0, Number(form.elements.other_children_count.value || 0)),
         adults: Math.max(0, Number(form.elements.other_adult_count.value || 0))
@@ -881,15 +892,15 @@
       children_count: counts.children,
       adult_count: counts.adults,
       participant_total: participantCount,
-      school_grade: type === 'Schule' ? data.get('school_grade') || '' : '',
       school_class_count: type === 'Schule' ? Number(data.get('school_class_count') || 0) : '',
-      school_teachers_per_class: type === 'Schule' ? Number(data.get('school_teachers_per_class') || 0) : '',
-      school_children_per_class: type === 'Schule' ? Number(data.get('school_children_per_class') || 0) : '',
+      school_support: type === 'Schule' ? data.get('school_support') || '' : '',
+      school_support_amount: data.get('school_support_amount') || '',
+      school_support_note: data.get('school_support_note') || '',
       school_needs: type === 'Schule' ? data.get('school_needs') || '' : '',
       school_schedule_notes: type === 'Schule' ? data.get('school_schedule_notes') || '' : '',
       school_lesson_duration: type === 'Schule' ? data.get('school_lesson_duration') || '' : '',
       event_child_age_range: type === 'Veranstaltung' ? data.get('event_child_age_range') || '' : '',
-      occasion_description: type === 'Sonstiges' ? data.get('occasion_description') || '' : '',
+      occasion_description: data.get('occasion_description') || '',
       availability_window: data.get('availability_window') || '',
       contact_first_name: data.get('contact_first_name') || '',
       contact_last_name: data.get('contact_last_name') || '',
@@ -932,11 +943,7 @@
       accessibility_notes: type === 'Schule' ? data.get('school_needs') || '' : '',
       group_notes: type === 'Schule' ? data.get('school_needs') || '' : (type === 'Sonstiges' ? data.get('occasion_description') || '' : ''),
       general_notes: data.get('general_notes') || '',
-      classes: [{
-        class_name: type || 'Gruppe',
-        grade: type === 'Schule' ? gradeForSchool(data.get('school_grade')) : 1,
-        participant_count: participantCount
-      }]
+      classes: type === 'Schule' ? schoolClasses() : [{ class_name: type || 'Gruppe', grade: 1, participant_count: participantCount }]
     };
     if (!state.addressDirty && state.routeContext) {
       payload.latitude = state.routeContext.latitude;
@@ -974,7 +981,7 @@
     button.setAttribute('aria-busy', 'true');
 
     try {
-      const response = await fetch(api + 'requests', {
+      const response = await fetch(endpoint('requests'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(collectPayload())
@@ -1017,7 +1024,7 @@
     }
     if (action === 'check-route') checkRoute();
     if (action === 'close-walk-in') closeWalkIn();
-    if (action === 'confirm-calendar-selection') confirmCalendarSelection();
+    if (action === 'confirm-date') confirmDateRequest();
     if (action === 'back-route') backToRoute();
     if (action === 'recheck-form-route') recheckFormRoute();
     if (target.matches('[data-next]')) moveNext();
@@ -1035,6 +1042,23 @@
     }
   });
 
+  const latestDate = new Date(today);
+  latestDate.setMonth(latestDate.getMonth() + 18);
+  dateFrom.min = dateTo.min = iso(today);
+  dateFrom.max = dateTo.max = iso(latestDate);
+  dateMode.addEventListener('change', updateDateInputs);
+  dateFrom.addEventListener('change', updateDateInputs);
+  dateTo.addEventListener('change', updateDateInputs);
+  $$('[data-weekday]', dateRequest).forEach(function (field) {
+    field.addEventListener('change', function () {
+      if (field.checked) {
+        const others = field.dataset.weekday === 'all' ? $$('[data-weekday]:not([data-weekday="all"])', dateRequest) : [$('[data-weekday="all"]')];
+        others.forEach(other => { other.checked = false; });
+      }
+      dateStatus.textContent = '';
+    });
+  });
+
   $('[data-field="postal_code"]').addEventListener('input', handleRouteRegionChange);
   $('[data-field="state_code"]').addEventListener('change', handleRouteRegionChange);
   form.elements.postal_code.addEventListener('input', trackFormRegionChange);
@@ -1044,8 +1068,10 @@
     form.elements.participant_total.value = String(counts.children + counts.adults);
   }
   form.elements.institution_type.addEventListener('change', updateEventTypeSections);
-  $$('[data-participant-field], input[name="school_class_count"], input[name="school_teachers_per_class"]', form).forEach(function (field) {
-    field.addEventListener('input', syncParticipantTotal);
+  form.elements.school_support.addEventListener('change', updateSchoolSupport);
+  form.addEventListener('input', function (event) {
+    if (event.target === form.elements.school_class_count) updateSchoolClasses();
+    if (event.target.matches('[data-class-field], [data-participant-field], [name="school_class_count"]')) syncParticipantTotal();
   });
   form.elements.venue_type.addEventListener('change', updateVenueSections);
   $$('[data-toggle-other]', form).forEach(function (field) {

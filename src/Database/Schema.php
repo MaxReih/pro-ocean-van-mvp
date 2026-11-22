@@ -6,7 +6,7 @@ namespace ProOceanVan\Database;
 
 final class Schema
 {
-    public const VERSION = '2026.09.15.2';
+    public const VERSION = '2026.11.22.1';
 
     /**
      * @return string[]
@@ -42,6 +42,9 @@ final class Schema
                 school_needs TEXT NULL,
                 school_schedule_notes TEXT NULL,
                 school_lesson_duration VARCHAR(16) NULL,
+                school_support VARCHAR(16) NULL,
+                school_support_amount DECIMAL(10,2) NULL,
+                school_support_note VARCHAR(500) NULL,
                 event_child_age_range VARCHAR(120) NULL,
                 occasion_description TEXT NULL,
                 availability_window VARCHAR(32) NULL,
@@ -111,6 +114,9 @@ final class Schema
                 class_name VARCHAR(80) NOT NULL,
                 grade TINYINT UNSIGNED NOT NULL,
                 participant_count INT UNSIGNED NOT NULL,
+                children INT UNSIGNED NULL,
+                teachers INT UNSIGNED NULL,
+                adults INT UNSIGNED NULL,
                 sort_order INT UNSIGNED NOT NULL DEFAULT 0,
                 created_at DATETIME NOT NULL,
                 PRIMARY KEY  (id),

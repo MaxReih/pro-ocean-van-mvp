@@ -18,7 +18,11 @@ final class MailService
             return false;
         }
 
-        $body = $this->render((string) get_option('pov_confirmation_email_body'), $request, []);
+        $template = (string) get_option('pov_confirmation_email_body');
+        $body = $this->render($template, $request, []);
+        if (! str_contains($template, '{Buchungsübersicht}')) {
+            $body = rtrim($body) . "\n\n" . $this->bookingSummary($request);
+        }
         $subject = (string) get_option('pov_confirmation_email_subject', 'Deine Anfrage für den Ocean Van ist eingegangen');
         $attachments = (new AttachmentService())->optionIds('pov_confirmation_attachment_ids');
         $sent = $this->send((string) $request['contact_email'], $subject, $body, [], $attachments);
@@ -182,15 +186,59 @@ final class MailService
         if (($request['request_mode'] ?? '') === 'specific_date') {
             return GermanDateFormatter::full((string) ($request['specific_requested_date'] ?? ''));
         }
-        return mysql2date('d.m.Y', (string) ($request['desired_date_from'] ?? ''))
-            . ' – ' . mysql2date('d.m.Y', (string) ($request['desired_date_to'] ?? ''));
+        $from = (string) ($request['desired_date_from'] ?? '');
+        $to = (string) ($request['desired_date_to'] ?? '');
+        if ($from === $to) {
+            return GermanDateFormatter::full($from);
+        }
+        return GermanDateFormatter::short($from) . ' bis ' . GermanDateFormatter::short($to);
+    }
+
+    private function bookingSummary(array $request): string
+    {
+        $location = trim(trim((string) ($request['street'] ?? '') . ' ' . (string) ($request['house_number'] ?? '')) . ', '
+            . trim((string) ($request['postal_code'] ?? '') . ' ' . (string) ($request['city'] ?? '')), ', ');
+        $slot = ['morning' => 'Vormittag', 'afternoon' => 'Nachmittag', 'full_day' => 'Ganztägig'][(string) ($request['availability_window'] ?? '')] ?? '';
+        $adults = (int) ($request['adult_count'] ?? 0);
+        $lines = [
+            'Eure Anfrage im Überblick',
+            'Einrichtung: ' . (string) ($request['institution_name'] ?? ''),
+            'Veranstaltungsart: ' . (string) ($request['institution_type'] ?? ''),
+            'Terminwunsch: ' . $this->requestDate($request) . ($slot !== '' ? ' · ' . $slot : ''),
+            'Einsatzort: ' . $location,
+            'Gruppe: ' . (int) ($request['children_count'] ?? 0) . ' Kinder, ' . $adults . ($adults === 1 ? ' erwachsene Person' : ' Erwachsene'),
+        ];
+        if (($request['request_mode'] ?? '') === 'date_range' && ! empty($request['possible_weekdays'])) {
+            $keys = ['mon' => 'Mo', 'tue' => 'Di', 'wed' => 'Mi', 'thu' => 'Do', 'fri' => 'Fr', 'sat' => 'Sa', 'sun' => 'So'];
+            $days = array_intersect_key($keys, array_flip(explode(',', (string) $request['possible_weekdays'])));
+            if ($days && count($days) < 7) {
+                $lines[] = 'Mögliche Wochentage: ' . implode(', ', $days);
+            }
+        }
+        foreach ((array) ($request['classes'] ?? []) as $class) {
+            if (isset($class['children'])) {
+                $lines[] = (string) $class['class_name'] . ' (' . (int) $class['grade'] . '. Stufe): ' . (int) $class['children']
+                    . ' Kinder, ' . (int) $class['teachers'] . ' Lehrkräfte, ' . (int) $class['adults'] . ' weitere Erwachsene';
+            }
+        }
+        $venue = ['indoor' => 'Innenraum', 'outdoor' => 'Außenbereich', 'both' => 'Innen- und Außenbereich'][(string) ($request['venue_type'] ?? '')] ?? '';
+        $parking = ['schoolyard' => 'Schulhof', 'parking_lot' => 'Parkplatz', 'street' => 'Straßenrand / Ladezone', 'other' => 'Sonstiger Stellplatz'][(string) ($request['parking_type'] ?? '')] ?? '';
+        foreach ([
+            'Einsatzbereich' => $venue,
+            'Stellplatz' => $parking,
+            'Stellplatz-Link' => $request['parking_location'] ?? '',
+            'Unterrichts- und Pausenzeiten' => $request['school_schedule_notes'] ?? '',
+        ] as $label => $value) {
+            if ($value !== '') {
+                $lines[] = $label . ': ' . (string) $value;
+            }
+        }
+        return implode("\n", $lines);
     }
 
     public function render(string $template, array $request, array $suggestions): string
     {
-        $date = $request['request_mode'] === 'specific_date'
-            ? (string) $request['specific_requested_date']
-            : trim((string) $request['desired_date_from'] . ' bis ' . (string) $request['desired_date_to']);
+        $date = $this->requestDate($request);
         $suggestionLines = [];
         foreach ($suggestions as $suggestion) {
             $suggestionLines[] = GermanDateFormatter::full((string) $suggestion['suggestion_date']);
@@ -201,6 +249,7 @@ final class MailService
             '{Anfragekennung}' => (string) $request['public_uuid'],
             '{Termin oder Zeitraum}' => $date,
             '{Ort}' => (string) $request['city'],
+            '{Buchungsübersicht}' => str_contains($template, '{Buchungsübersicht}') ? $this->bookingSummary($request) : '',
             '{Terminvorschlaege}' => implode("\n", $suggestionLines),
             '{Terminvorschläge}' => implode("\n", $suggestionLines),
         ]);
@@ -212,9 +261,7 @@ final class MailService
             $template = "Hallo {Vorname},\n\nfür deine Anfrage {Anfragekennung} passen diese Termine gut:\n\n{Terminvorschläge}\n\nViele Grüße\nPro Ocean";
         }
 
-        $date = $request['request_mode'] === 'specific_date'
-            ? (string) $request['specific_requested_date']
-            : trim((string) $request['desired_date_from'] . ' bis ' . (string) $request['desired_date_to']);
+        $date = $this->requestDate($request);
         $html = nl2br(esc_html($template));
         $suggestionHtml = $this->proposalButtons($request, $suggestions);
 

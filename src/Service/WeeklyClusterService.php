@@ -477,17 +477,12 @@ final class WeeklyClusterService
             return [];
         }
         $weekdays = array_filter(explode(',', (string) ($request['possible_weekdays'] ?? '')));
-        $dates = [];
-        for ($day = new DateTimeImmutable($from); $day->format('Y-m-d') <= $to; $day = $day->modify('+1 day')) {
-            if ((int) $day->format('N') >= 6) {
-                continue;
-            }
-            if ($weekdays && ! in_array(strtolower($day->format('D')), $weekdays, true)) {
-                continue;
-            }
-            $dates[] = $day->format('Y-m-d');
-        }
-        return $dates;
+        return (new AvailabilityService())->requestableDates(
+            (string) ($request['state_code'] ?? ''),
+            max($from, current_time('Y-m-d')),
+            $to,
+            $weekdays ?: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        );
     }
 
     private function depotForCluster(array $anchors): ?array
