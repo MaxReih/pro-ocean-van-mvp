@@ -125,18 +125,18 @@ await evaluate(`(() => {
 })()`);
 await waitFor(`(() => {
   const busy = document.querySelector('[data-role="suggestions"]')?.getAttribute('aria-busy') === 'true';
-  return !busy && document.querySelectorAll('.pov-suggestion').length === 2;
+  return !busy && document.querySelectorAll('.pov-suggestion.is-top-date').length === 3;
 })()`, 60000);
+await evaluate('document.querySelector(\'[data-role="date-picker"] summary\').click()');
+await waitFor('document.querySelector("[data-role=picker-calendar]")?.getAttribute("aria-busy") === "false" && document.querySelector("[data-role=picker-calendar] .pov-day") !== null');
 const routeAudit = await evaluate(`(() => ({
   durationMs: ${Date.now()} - ${routeStarted},
-  suggestions: document.querySelectorAll('.pov-suggestion').length,
-  greenDates: document.querySelectorAll('.pov-day[data-state="available"]').length,
-  geoUnavailableDates: document.querySelectorAll('.pov-day[data-state="geo_unavailable"]').length,
+  suggestions: document.querySelectorAll('.pov-suggestion.is-top-date').length,
+  unavailableDates: document.querySelectorAll('[data-role="picker-calendar"] .pov-day[data-state="unavailable"]:disabled').length,
   routeStatus: document.querySelector('[data-role="route-status"]')?.textContent.trim() || '',
 }))()`);
-expect(routeAudit.suggestions === 2, 'Es werden nicht genau zwei Routentermine angezeigt.');
-expect(routeAudit.geoUnavailableDates > 0, 'Nicht passende Kalendertage werden nach der PLZ-Prüfung nicht ausgegraut.');
-expect(routeAudit.greenDates === 0, 'Zu kurzfristige oder geographisch unpassende Tage bleiben im aktuellen Monat grün.');
+expect(routeAudit.suggestions === 3, 'Es werden nicht genau drei Routentermine angezeigt.');
+expect(routeAudit.unavailableDates > 0, 'Nicht verfügbare Termine sind im Kalenderpicker nicht gesperrt.');
 await screenshot('current-features-frontend.png');
 
 const phpCode = `define('WP_HOME', ${JSON.stringify(baseUrl)}); define('WP_SITEURL', ${JSON.stringify(baseUrl)}); require ${JSON.stringify(wpLoad)}; $users=get_users(['role'=>'administrator','number'=>1]); if(!$users){exit(2);} $expires=time()+900; global $wpdb; $request_id=(int)$wpdb->get_var("SELECT request_id FROM {$wpdb->prefix}pov_appointments WHERE status='confirmed' AND request_id IS NOT NULL ORDER BY id DESC LIMIT 1"); echo wp_json_encode(['cookies'=>[['name'=>AUTH_COOKIE,'value'=>wp_generate_auth_cookie($users[0]->ID,$expires,'auth'),'expires'=>$expires],['name'=>LOGGED_IN_COOKIE,'value'=>wp_generate_auth_cookie($users[0]->ID,$expires,'logged_in'),'expires'=>$expires]],'request_id'=>$request_id]);`;

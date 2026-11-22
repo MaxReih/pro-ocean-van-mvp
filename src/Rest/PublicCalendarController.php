@@ -41,7 +41,7 @@ final class PublicCalendarController
     {
         $state = strtoupper(sanitize_key((string) $request->get_param('state_code')));
         if (! (new \ProOceanVan\Repository\StateRepository())->isActive($state)) {
-            return ['available' => false];
+            return ['available' => false, 'dates' => []];
         }
         $days = (new AvailabilityService())->requestableDates(
             $state,
@@ -49,7 +49,7 @@ final class PublicCalendarController
             (string) $request->get_param('to'),
             explode(',', (string) $request->get_param('weekdays'))
         );
-        return ['available' => (bool) $days];
+        return ['available' => (bool) $days, 'dates' => $days];
     }
 
     public function calendar(WP_REST_Request $request): array|WP_Error

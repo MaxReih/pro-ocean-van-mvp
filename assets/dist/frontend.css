@@ -466,27 +466,6 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   border-color: #9ecdb2;
 }
 
-.pov-suggestion.is-week {
-  background: var(--pov-sky);
-  border-style: dashed;
-}
-
-.pov-suggestion.is-top-date {
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-}
-
-.pov-top-date-rank {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  color: var(--pov-white);
-  background: var(--pov-blue);
-  border-radius: 50%;
-  font-family: Coolvetica, "Arial Rounded MT Bold", Arial, sans-serif;
-  font-size: 1rem;
-}
-
 .pov-suggestion.is-day {
   grid-template-columns: 64px minmax(0, 1fr) auto;
 }
@@ -505,12 +484,8 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   font-size: .82rem;
 }
 
-.pov-suggestion-tag {
-  color: var(--pov-blue);
-  font-size: .68rem;
-  font-weight: 850;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+.pov-suggestion-copy time {
+  font-weight: 650;
 }
 
 .pov-date-tile {
@@ -759,19 +734,91 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   gap: 14px;
 }
 
-.pov-date-request > .pov-button {
-  justify-self: start;
+.pov-date-request > h3 {
+  margin: 0;
+}
+
+.pov-date-picker {
+  border-top: 1px solid var(--pov-mist);
+  padding-top: 14px;
+}
+
+.pov-date-picker > summary {
+  display: list-item;
+  width: fit-content;
+  padding: 8px 0;
+  color: var(--pov-blue);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.pov-picker-body {
+  display: grid;
+  gap: 12px;
+  max-width: 620px;
+  padding-top: 12px;
+}
+
+.pov-picker-body > label {
+  max-width: 220px;
+}
+
+.pov-picker-body .pov-calendar-toolbar,
+.pov-picker-body .pov-legend {
+  margin: 0;
+}
+
+.pov-picker-body .pov-day {
+  min-height: 40px;
+}
+
+.pov-picker-body .pov-day[data-state="unavailable"] {
+  color: #53636a;
+  background: repeating-linear-gradient(135deg, #edf1f3, #edf1f3 5px, #e3e9ec 5px, #e3e9ec 6px);
+  border-color: #ced8dd;
+  opacity: 1;
+}
+
+.pov-picker-body .pov-legend .is-unavailable {
+  background: #e3e9ec;
+}
+
+.pov-picker-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
 }
 
 .pov-tour-outlook {
   margin-top: 14px;
 }
 
-.pov-school-class {
+.pov-form .pov-school-class,
+.pov-form .pov-school-support {
   min-width: 0;
   border: 1px solid var(--pov-mist);
   border-radius: var(--pov-radius-sm);
-  padding: 12px;
+  padding: clamp(14px, 3vw, 20px);
+  background: var(--pov-white);
+}
+
+.pov-form .pov-school-class > legend,
+.pov-form .pov-school-support > legend {
+  padding: 0 6px;
+  font-size: 1.03rem;
+}
+
+.pov-form .pov-school-support {
+  display: grid;
+  gap: 14px;
+}
+
+.pov-school-support p {
+  margin: 0;
+  font-size: .88rem;
 }
 
 .pov-form .pov-region-summary {
@@ -784,26 +831,6 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 
 .pov-form .pov-region-summary strong {
   font-size: 1rem;
-}
-
-.pov-calendar-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.pov-calendar-note {
-  margin: 10px 0 0;
-  color: var(--pov-muted);
-  font-size: .82rem;
-}
-
-.pov-calendar-actions[hidden] {
-  display: none;
-}
-
-.pov-calendar-actions .pov-button {
-  min-width: 112px;
 }
 
 .pov-day:disabled {
@@ -999,7 +1026,7 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 
 .pov-form > fieldset > legend {
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: clamp(18px, 3vw, 26px);
   font-size: clamp(1.7rem, 3.2vw, 2.35rem);
 }
 
@@ -1015,6 +1042,22 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
   align-items: end;
 }
 
+.pov-form .pov-grid-2 {
+  column-gap: clamp(14px, 3vw, 24px);
+  row-gap: clamp(16px, 2.7vw, 22px);
+}
+
+.pov-form-group + .pov-form-group {
+  margin-top: clamp(22px, 4vw, 32px);
+  padding-top: clamp(16px, 3vw, 24px);
+  border-top: 1px solid var(--pov-mist);
+}
+
+.pov-form-group > h2 {
+  margin: 0 0 14px;
+  font-size: 1.2rem;
+}
+
 .pov-span-2 {
   grid-column: span 2;
 }
@@ -1027,17 +1070,30 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
 
 .pov-type-section,
 .pov-detail-block {
-  margin-top: 24px;
-  padding: 20px;
+  margin-top: clamp(22px, 4vw, 32px);
+  padding: clamp(16px, 3vw, 24px);
   background: var(--pov-ice);
   border: 1px solid var(--pov-mist);
   border-radius: var(--pov-radius);
+}
+
+.pov-type-section {
+  display: grid;
+  gap: clamp(16px, 3vw, 22px);
 }
 
 .pov-type-section > h2,
 .pov-detail-block > h2 {
   margin: 0 0 16px;
   font-size: 1.25rem;
+}
+
+.pov-type-section > h2 {
+  margin-bottom: 0;
+}
+
+.pov-detail-block > .pov-questions {
+  margin: 0;
 }
 
 .pov-type-section textarea,
@@ -1566,18 +1622,15 @@ body:has(.pov-access-gate) #wp--skip-link--target > .wp-block-group { padding-to
     justify-self: start;
   }
 
-  .pov-suggestion,
-  .pov-suggestion.is-day,
-  .pov-suggestion.is-top-date {
+  .pov-suggestion.is-day {
     grid-template-columns: 42px minmax(0, 1fr);
   }
 
-  .pov-suggestion.is-week {
+  .pov-suggestion.is-top-date {
     grid-template-columns: 1fr;
   }
 
   .pov-suggestion.is-day > .pov-secondary-button,
-  .pov-suggestion.is-week > .pov-button,
   .pov-suggestion.is-top-date > .pov-button,
   .pov-suggestion.is-top-date > .pov-secondary-button {
     grid-column: 1 / -1;

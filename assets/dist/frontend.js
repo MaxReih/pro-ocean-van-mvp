@@ -19,9 +19,10 @@
   const calendarElement = $('[data-role="calendar"]');
 
   const dateRequest = $('[data-role="date-request"]');
+  const pickerPanel = $('[data-role="date-picker"]');
+  const pickerElement = $('[data-role="picker-calendar"]');
+  const pickerStatus = $('[data-role="picker-status"]');
   const dateMode = $('[data-role="date-mode"]');
-  const dateFrom = $('[data-role="date-from"]');
-  const dateTo = $('[data-role="date-to"]');
   const dateStatus = $('[data-role="date-status"]');
   const dateNext = $('[data-action="confirm-date"]');
   const weekdayCodes = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -33,14 +34,14 @@
   firstSuggestedDate.setDate(firstSuggestedDate.getDate() + 14);
   const horizon = new Date(today);
   horizon.setDate(horizon.getDate() + 365);
+  const latestDate = new Date(today);
+  latestDate.setMonth(latestDate.getMonth() + 18);
 
   const state = {
     month: new Date(today.getFullYear(), today.getMonth(), 1),
     days: new Map(),
-    recommendations: new Set(),
     recommendationByDate: new Map(),
     geoEligibleDates: new Set(),
-    geoFilterApplied: false,
     eligibilityToken: '',
     selectedRecommendation: null,
     selectedDate: '',
@@ -64,6 +65,10 @@
   let routeTimer = null;
   let routeController = null;
   let calendarController = null;
+  let pickerController = null;
+  let pickerStart = '';
+  let pickerEnd = '';
+  let pickerChecking = false;
 
   const calendar = new window.POVCalendar(calendarElement, {
     initialMonth: state.month,
@@ -72,6 +77,7 @@
       openWalkIn(date, row);
     }
   });
+  const picker = new window.POVCalendar(pickerElement, { initialMonth: state.month, onSelect: selectPickerDay });
 
   function iso(date) {
     const year = date.getFullYear();
@@ -195,21 +201,20 @@
   function clearRecommendations(title, text, clearDate) {
     state.routeContext = null;
     state.selectedRecommendation = null;
-    state.recommendations = new Set();
     state.recommendationByDate = new Map();
     state.geoEligibleDates = new Set();
-    state.geoFilterApplied = false;
     state.eligibilityToken = '';
     if (clearDate) {
       state.selectedDate = '';
       state.rangeFrom = '';
       state.rangeTo = '';
-      dateFrom.value = '';
-      dateTo.value = '';
-      updateDateInputs();
+      pickerPanel.open = false;
+      if (pickerController) pickerController.abort();
+      pickerController = null;
+      picker.setRows([]);
+      pickerStart = pickerEnd = '';
+      renderPickerSelection();
     }
-    calendar.setRecommended([]);
-    renderCalendar();
     if (title || text) renderSuggestionPlaceholder(title, text, 'warning');
     else suggestionsElement.replaceChildren();
   }
@@ -286,42 +291,31 @@
       });
       const data = await responseData(response);
       if (!response.ok) {
-        const apiError = new Error(data.message || 'Keine Routentermine gefunden.');
-        apiError.isApiError = true;
-        throw apiError;
+        throw new Error('recommendations');
       }
       if (requestId !== state.routeRequestId || routeRegionKey() !== key) return;
 
       state.activeRegionKey = key;
       state.routeContext = data.route_context || null;
-      state.geoFilterApplied = data.filter_applied === true;
       state.geoEligibleDates = new Set(Array.isArray(data.eligible_dates) ? data.eligible_dates : []);
       state.eligibilityToken = typeof data.eligibility_token === 'string' ? data.eligibility_token : '';
       if (!routeScreen.hidden) {
         copyRouteRegionToForm();
         markRouteFresh();
       }
-      renderSuggestions(
-        Array.isArray(data.suggestions) ? data.suggestions : [],
-        Array.isArray(data.week_suggestions) ? data.week_suggestions : []
-      );
-      renderCalendar();
-      setRouteStatus(data.fallback ? (data.message || 'Bitte Zeitraum anfragen.') : 'Route geprüft.', data.fallback ? 'warning' : 'success');
+      renderSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+      setRouteStatus('');
     } catch (error) {
       if ((error.name === 'AbortError' && !requestTimedOut) || requestId !== state.routeRequestId || routeRegionKey() !== key) return;
       state.activeRegionKey = key;
-      state.geoFilterApplied = true;
       state.geoEligibleDates = new Set();
       state.eligibilityToken = '';
       if (!routeScreen.hidden) {
         copyRouteRegionToForm();
         markRouteFresh();
       }
-      renderCalendar();
-      renderSuggestionPlaceholder('Keine Routentermine geladen', 'Ihr könnt einen Wunschtermin anfragen.', 'warning');
-      setRouteStatus(requestTimedOut
-        ? 'Die Routensuche dauert zu lange. Bitte Zeitraum anfragen.'
-        : (error.isApiError ? error.message + ' ' : '') + 'Bitte Zeitraum anfragen.', 'error');
+      renderSuggestions([]);
+      setRouteStatus(requestTimedOut ? 'Die Routensuche dauert gerade zu lange.' : 'Die Routensuche ist gerade nicht verfügbar.', 'error');
     } finally {
       window.clearTimeout(requestTimeout);
       if (requestId === state.routeRequestId) {
@@ -331,17 +325,15 @@
     }
   }
 
-  function renderSuggestions(items, weeks) {
+  function renderSuggestions(items) {
     const best = items.filter(function (item) {
       return item && typeof item.date === 'string' && item.date >= iso(firstSuggestedDate);
-    }).slice(0, 2);
-    state.recommendations = new Set(best.map(function (item) { return item.date; }));
+    }).slice(0, 3);
     state.recommendationByDate = new Map(best.map(function (item) { return [item.date, item]; }));
-    calendar.setRecommended(Array.from(state.recommendations));
     suggestionsElement.innerHTML = '';
 
     if (!best.length) {
-      renderSuggestionPlaceholder('Keine Routenvorschläge', 'Ihr könnt einen Wunschtermin anfragen.', 'warning');
+      renderSuggestionPlaceholder('Aktuell gibt es keine passenden Routenvorschläge.', '', 'warning');
       return;
     }
 
@@ -350,44 +342,25 @@
       article.className = 'pov-suggestion is-top-date' + (index === 0 ? ' is-best' : '');
       article.dataset.date = item.date;
       article.innerHTML =
-        '<div class="pov-top-date-rank" aria-hidden="true">' + (index + 1) + '</div>' +
         '<div class="pov-suggestion-copy">' +
-        '<h3>' + escapeHtml(formatDate(item.date)) + '</h3>' +
+        '<time datetime="' + escapeHtml(item.date) + '">' + escapeHtml(formatDate(item.date)) + '</time>' +
         '</div>';
       const button = document.createElement('button');
       button.type = 'button';
       button.className = index === 0 ? 'pov-button' : 'pov-secondary-button';
-      if (index === 0) {
-        const tag = document.createElement('span');
-        tag.className = 'pov-suggestion-tag';
-        tag.textContent = 'Beste Routenoption';
-        article.querySelector('.pov-suggestion-copy').appendChild(tag);
-      }
-      button.textContent = 'Datum übernehmen';
-      button.setAttribute('aria-label', formatDate(item.date) + ' übernehmen');
+      button.textContent = 'Termin wählen';
+      button.setAttribute('aria-label', formatDate(item.date) + ' wählen');
       button.addEventListener('click', function () {
-        prefillDateRequest(item.date);
+        if (state.activeRegionKey !== routeRegionKey() || !state.eligibilityToken || !state.geoEligibleDates.has(item.date)) {
+          setRouteStatus('Bitte sucht die passenden Termine erneut.', 'error');
+          return;
+        }
+        openFormForDates(item.date, item.date, [], true);
       });
       article.appendChild(button);
       suggestionsElement.appendChild(article);
     });
 
-    const week = Array.isArray(weeks) ? weeks.find(function (item) {
-      return item && Array.isArray(item.available_days) && item.available_days.length > 1;
-    }) : null;
-    if (week) {
-      const article = document.createElement('article');
-      article.className = 'pov-suggestion is-week';
-      article.innerHTML = '<div class="pov-suggestion-copy"><h3>' + escapeHtml(week.label || 'Passende Woche') +
-        '</h3><p>' + week.available_days.length + ' mögliche Tage</p></div>';
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'pov-secondary-button';
-      button.textContent = 'Zeitraum übernehmen';
-button.addEventListener('click', function () { prefillDateRequest(week.date_from, week.date_to); });
-      article.appendChild(button);
-      suggestionsElement.appendChild(article);
-    }
   }
 
   function monthBounds() {
@@ -421,14 +394,7 @@ button.addEventListener('click', function () { prefillDateRequest(week.date_from
       year: 'numeric'
     }).format(state.month);
     calendar.setMonth(state.month);
-    calendar.setRecommended(Array.from(state.recommendations));
-    calendar.setRows(Array.from(state.days.values()).map(function (row) {
-      const geoUnavailable = state.geoFilterApplied && row.is_selectable && !state.geoEligibleDates.has(row.date);
-      return Object.assign({}, row, {
-        public_state: geoUnavailable ? 'geo_unavailable' : row.public_state,
-        public_label: geoUnavailable ? 'Für die Route nicht empfohlen' : row.public_label
-      });
-    }));
+    calendar.setRows(Array.from(state.days.values()));
     updateMonthButtons();
   }
 
@@ -467,34 +433,106 @@ button.addEventListener('click', function () { prefillDateRequest(week.date_from
     }
   }
 
-  function updateDateInputs() {
-    const range = dateMode.value === 'range';
-    $('[data-role="date-from-label"]').textContent = range ? 'Von' : 'Datum';
-    $('[data-role="date-to-wrap"]').hidden = !range;
-    $('[data-role="preferred-weekdays"]').hidden = !range;
-    dateTo.min = dateFrom.value || dateFrom.min;
-    dateStatus.textContent = '';
+  async function loadPickerMonth() {
+    if (!pickerPanel.open || !routeRegionKey() || dateRequest.hidden) return;
+    if (pickerController) pickerController.abort();
+    const controller = new AbortController();
+    pickerController = controller;
+    const key = routeRegionKey();
+    const bounds = picker.bounds();
+    $('[data-role="picker-month"]').textContent = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(picker.month);
+    $('[data-action="picker-prev"]').disabled = bounds.start <= iso(today);
+    $('[data-action="picker-next"]').disabled = bounds.end >= iso(latestDate);
+    picker.setRows([]);
+    pickerElement.setAttribute('aria-busy', 'true');
+    pickerStatus.textContent = 'Verfügbarkeit wird geladen …';
+    const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+    try {
+      const from = bounds.start > iso(today) ? bounds.start : iso(today);
+      const to = bounds.end < iso(latestDate) ? bounds.end : iso(latestDate);
+      const data = await fetchAvailability(from, to, weekdayCodes, controller.signal);
+      if (!Array.isArray(data.dates)) throw new Error('availability');
+      if (pickerController !== controller || key !== routeRegionKey()) return;
+      const available = new Set(data.dates);
+      const rows = [];
+      const end = new Date(bounds.end + 'T12:00:00');
+      for (let day = new Date(bounds.start + 'T12:00:00'); day <= end; day.setDate(day.getDate() + 1)) {
+        const date = iso(day);
+        const selectable = available.has(date);
+        const weekend = day.getDay() === 0 || day.getDay() === 6;
+        rows.push({
+          date,
+          public_state: selectable ? (weekend ? 'limited' : 'available') : 'unavailable',
+          public_label: selectable ? (weekend ? 'Auf Anfrage' : 'Verfügbar') : 'Nicht verfügbar',
+          is_selectable: selectable,
+        });
+      }
+      picker.setRows(rows);
+      pickerStatus.textContent = available.size ? '' : 'In diesem Monat sind keine Termine anfragbar.';
+    } catch {
+      if (pickerController === controller) pickerStatus.textContent = 'Verfügbarkeit konnte nicht geladen werden. Öffnet die Terminwahl erneut.';
+    } finally {
+      window.clearTimeout(timeout);
+      if (pickerController === controller) {
+        pickerController = null;
+        pickerElement.setAttribute('aria-busy', 'false');
+      }
+    }
   }
 
-  function prefillDateRequest(from, to) {
-    dateMode.value = to ? 'range' : 'single';
-    dateFrom.value = from;
-    dateTo.value = to || '';
-    $$('[data-weekday]', dateRequest).forEach(field => { field.checked = field.dataset.weekday === 'all'; });
-    updateDateInputs();
-    dateFrom.focus({ preventScroll: true });
-    dateRequest.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'center' });
+  function renderPickerSelection() {
+    const range = dateMode.value === 'range';
+    const selection = $('[data-role="picker-selection"]');
+    $('[data-role="preferred-weekdays"]').hidden = !range;
+    picker.setSelection(pickerStart, pickerEnd);
+    if (!pickerStart) selection.textContent = range ? 'Startdatum wählen' : 'Tag wählen';
+    else if (range && !pickerEnd) selection.textContent = formatDate(pickerStart, 'medium') + ' · Enddatum wählen';
+    else if (range && pickerStart !== pickerEnd) selection.textContent = formatDate(pickerStart, 'medium') + ' bis ' + formatDate(pickerEnd, 'medium');
+    else selection.textContent = formatDate(pickerStart);
+    dateNext.disabled = pickerChecking || !pickerStart || (range && !pickerEnd);
+  }
+
+  function selectPickerDay(date) {
+    if (dateMode.value !== 'range' || !pickerStart || pickerEnd) {
+      pickerStart = date;
+      pickerEnd = '';
+    } else if (date < pickerStart) {
+      pickerEnd = pickerStart;
+      pickerStart = date;
+    } else {
+      pickerEnd = date;
+    }
+    dateStatus.textContent = '';
+    renderPickerSelection();
+    pickerElement.querySelector('[data-date="' + date + '"]')?.focus({ preventScroll: true });
   }
 
   function datePreference() {
     const range = dateMode.value === 'range';
     return {
       range,
-      from: dateFrom.value,
-      to: range ? dateTo.value : dateFrom.value,
+      from: pickerStart,
+      to: range ? pickerEnd : pickerStart,
       weekdays: !range || $('[data-weekday="all"]').checked
         ? weekdayCodes : $$('[data-weekday]:checked', dateRequest).map(field => field.dataset.weekday)
     };
+  }
+
+  async function fetchAvailability(from, to, weekdays, signal) {
+    const params = { state_code: routeRegionValues().code, from, to, weekdays: weekdays.join(',') };
+    const response = await fetch(endpoint('availability', params), { signal });
+    if (!response.ok) throw new Error('availability');
+    return responseData(response);
+  }
+
+  function openFormForDates(from, to, weekdays, routeDate) {
+    state.mode = routeDate ? 'specific_date' : 'date_range';
+    state.selectedRecommendation = routeDate ? state.recommendationByDate.get(from) || null : null;
+    state.selectedDate = routeDate ? from : '';
+    state.rangeFrom = routeDate ? '' : from;
+    state.rangeTo = routeDate ? '' : to;
+    state.possibleWeekdays = routeDate ? [] : weekdays;
+    openForm();
   }
 
   async function confirmDateRequest() {
@@ -502,40 +540,33 @@ button.addEventListener('click', function () { prefillDateRequest(week.date_from
     const preference = datePreference();
     const { range, from, to, weekdays } = preference;
     const span = (Date.parse(to) - Date.parse(from)) / 86400000;
-    if (!from || !to || !dateFrom.validity.valid || (range && !dateTo.validity.valid) || span < 0 || span >= 180 || !weekdays.length) {
+    if (!from || !to || span < 0 || span >= 180 || !weekdays.length) {
       dateStatus.textContent = 'Bitte prüft Datum und Wochentage. Ein Zeitraum darf höchstens 180 Tage umfassen.';
       return;
     }
 
     const key = routeRegionKey();
-    const params = new URLSearchParams({ state_code: routeRegionValues().code, from, to, weekdays: weekdays.join(',') });
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
-    dateNext.disabled = true;
+    pickerChecking = true;
+    renderPickerSelection();
     dateStatus.textContent = 'Verfügbarkeit wird geprüft …';
     try {
-      const response = await fetch(endpoint('availability', params), { signal: controller.signal });
-      const data = await responseData(response);
-      if (!response.ok) throw new Error('availability');
-      if (key !== routeRegionKey() || JSON.stringify(preference) !== JSON.stringify(datePreference())) return;
+      const data = await fetchAvailability(from, to, weekdays, controller.signal);
+      if (routeScreen.hidden || !pickerPanel.open || key !== routeRegionKey() || JSON.stringify(preference) !== JSON.stringify(datePreference())) return;
       if (!data.available) {
         dateStatus.textContent = 'Für diese Auswahl ist kein Tag anfragbar. Bitte wählt ein anderes Datum oder andere Wochentage.';
         return;
       }
       const routeDate = !range && state.activeRegionKey === key && state.eligibilityToken && state.geoEligibleDates.has(from);
-      state.mode = routeDate ? 'specific_date' : 'date_range';
-      state.selectedRecommendation = routeDate ? state.recommendationByDate.get(from) || null : null;
-      state.selectedDate = routeDate ? from : '';
-      state.rangeFrom = routeDate ? '' : from;
-      state.rangeTo = routeDate ? '' : to;
-      state.possibleWeekdays = routeDate ? [] : weekdays;
       dateStatus.textContent = '';
-      openForm();
+      openFormForDates(from, to, weekdays, routeDate);
     } catch {
       dateStatus.textContent = 'Die Verfügbarkeit ließ sich gerade nicht prüfen. Bitte erneut versuchen.';
     } finally {
       window.clearTimeout(timeout);
-      dateNext.disabled = false;
+      pickerChecking = false;
+      renderPickerSelection();
     }
   }
 
@@ -1022,6 +1053,11 @@ button.addEventListener('click', function () { prefillDateRequest(week.date_from
       state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1);
       loadCalendar();
     }
+    if (action === 'picker-prev' || action === 'picker-next') {
+      const offset = action === 'picker-prev' ? -1 : 1;
+      picker.setMonth(new Date(picker.month.getFullYear(), picker.month.getMonth() + offset, 1));
+      loadPickerMonth();
+    }
     if (action === 'check-route') checkRoute();
     if (action === 'close-walk-in') closeWalkIn();
     if (action === 'confirm-date') confirmDateRequest();
@@ -1042,13 +1078,19 @@ button.addEventListener('click', function () { prefillDateRequest(week.date_from
     }
   });
 
-  const latestDate = new Date(today);
-  latestDate.setMonth(latestDate.getMonth() + 18);
-  dateFrom.min = dateTo.min = iso(today);
-  dateFrom.max = dateTo.max = iso(latestDate);
-  dateMode.addEventListener('change', updateDateInputs);
-  dateFrom.addEventListener('change', updateDateInputs);
-  dateTo.addEventListener('change', updateDateInputs);
+  pickerPanel.addEventListener('toggle', function () {
+    if (pickerPanel.open) loadPickerMonth();
+    else {
+      if (pickerController) pickerController.abort();
+      pickerController = null;
+      pickerElement.setAttribute('aria-busy', 'false');
+    }
+  });
+  dateMode.addEventListener('change', function () {
+    pickerEnd = '';
+    dateStatus.textContent = '';
+    renderPickerSelection();
+  });
   $$('[data-weekday]', dateRequest).forEach(function (field) {
     field.addEventListener('change', function () {
       if (field.checked) {
@@ -1099,5 +1141,6 @@ button.addEventListener('click', function () { prefillDateRequest(week.date_from
   updateEventTypeSections();
   updateVenueSections();
   updateOtherFields();
+  renderPickerSelection();
   loadCalendar();
 })();

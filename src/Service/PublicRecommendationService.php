@@ -213,7 +213,7 @@ final class PublicRecommendationService
             static fn (array $suggestion): string => (string) $suggestion['date'],
             $suggestions
         )));
-        $suggestions = array_slice($suggestions, 0, 2);
+        $suggestions = array_slice($suggestions, 0, 3);
         $publicSuggestions = array_map(static fn (array $suggestion): array => [
             'date' => (string) $suggestion['date'],
             'label' => (string) $suggestion['label'],

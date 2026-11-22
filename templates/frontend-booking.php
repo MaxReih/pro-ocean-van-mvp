@@ -49,26 +49,40 @@ $schoolGrades = \ProOceanVan\Domain\SchoolClasses::configuredGrades();
             <p data-role="region-contact" hidden>In diesem Bundesland sind derzeit keine Buchungsanfragen möglich. <a href="<?php echo esc_url($contact); ?>">Kontakt zu Pro Ocean</a></p>
 
             <section class="pov-option-panel pov-date-request" aria-labelledby="pov-date-request-title" data-role="date-request" hidden>
-                <h3 id="pov-date-request-title">Wunschtermin</h3>
+                <h3 id="pov-date-request-title">Passende Termine</h3>
                 <div class="pov-suggestions" data-role="suggestions" aria-live="polite" aria-busy="false"></div>
-                <label>Terminart
-                    <select data-role="date-mode"><option value="single">Einzeltag</option><option value="range">Zeitraum</option></select>
-                </label>
-                <div class="pov-grid-2">
-                    <label><span data-role="date-from-label">Datum</span><input type="date" data-role="date-from"></label>
-                    <label data-role="date-to-wrap" hidden>Bis<input type="date" data-role="date-to"></label>
-                </div>
-                <fieldset class="pov-choice-fieldset" data-role="preferred-weekdays" hidden>
-                    <legend>Mögliche Wochentage</legend>
-                    <div class="pov-checklist">
-                        <label><input type="checkbox" data-weekday="all" checked><span>Keine Präferenz</span></label>
-                        <?php foreach (['mon' => 'Mo', 'tue' => 'Di', 'wed' => 'Mi', 'thu' => 'Do', 'fri' => 'Fr', 'sat' => 'Sa', 'sun' => 'So'] as $day => $name) : ?>
-                            <label><input type="checkbox" data-weekday="<?php echo esc_attr($day); ?>"><span><?php echo esc_html($name); ?></span></label>
-                        <?php endforeach; ?>
+                <details class="pov-date-picker" data-role="date-picker">
+                    <summary>Weitere Termine anfragen</summary>
+                    <div class="pov-picker-body">
+                        <label>Terminart
+                            <select data-role="date-mode"><option value="single">Einzeltag</option><option value="range">Zeitraum</option></select>
+                        </label>
+                        <div class="pov-calendar-toolbar">
+                            <button type="button" class="pov-icon-button" data-action="picker-prev" aria-label="Vorheriger Monat der Terminwahl">‹</button>
+                            <strong data-role="picker-month"></strong>
+                            <button type="button" class="pov-icon-button" data-action="picker-next" aria-label="Nächster Monat der Terminwahl">›</button>
+                        </div>
+                        <div class="pov-live" role="status" data-role="picker-status"></div>
+                        <div class="pov-calendar" data-role="picker-calendar" role="group" aria-label="Wunschtermin im Kalender auswählen" aria-busy="false"></div>
+                        <div class="pov-legend" aria-label="Legende der Terminwahl">
+                            <span><i class="is-unavailable"></i>Nicht verfügbar</span>
+                        </div>
+                        <fieldset class="pov-choice-fieldset" data-role="preferred-weekdays" hidden>
+                            <legend>Mögliche Wochentage</legend>
+                            <div class="pov-checklist">
+                                <label><input type="checkbox" data-weekday="all" checked><span>Keine Präferenz</span></label>
+                                <?php foreach (['mon' => 'Mo', 'tue' => 'Di', 'wed' => 'Mi', 'thu' => 'Do', 'fri' => 'Fr', 'sat' => 'Sa', 'sun' => 'So'] as $day => $name) : ?>
+                                    <label><input type="checkbox" data-weekday="<?php echo esc_attr($day); ?>"><span><?php echo esc_html($name); ?></span></label>
+                                <?php endforeach; ?>
+                            </div>
+                        </fieldset>
+                        <div class="pov-picker-actions">
+                            <output data-role="picker-selection" aria-live="polite"></output>
+                            <button type="button" class="pov-button" data-action="confirm-date" disabled>Weiter <span aria-hidden="true">→</span></button>
+                        </div>
+                        <div class="pov-live" role="status" data-role="date-status"></div>
                     </div>
-                </fieldset>
-                <div class="pov-live" role="status" aria-live="polite" data-role="date-status"></div>
-                <button type="button" class="pov-button" data-action="confirm-date">Weiter <span aria-hidden="true">→</span></button>
+                </details>
             </section>
 
             <section class="pov-option-panel" id="pov-calendar-panel" data-role="calendar-panel" aria-labelledby="pov-calendar-title">
@@ -115,58 +129,66 @@ $schoolGrades = \ProOceanVan\Domain\SchoolClasses::configuredGrades();
         <fieldset data-form-step="1">
             <legend tabindex="-1">Kontakt und Einsatzort</legend>
 
-            <div class="pov-grid-2">
-                <label>Einrichtung oder Veranstalter
-                    <input name="institution_name" required autocomplete="organization" placeholder="z. B. Meerblick-Schule oder Stadtfest">
-                </label>
-                <label>Veranstaltungsart
-                    <select name="institution_type" required>
-                        <option value="">Bitte auswählen</option>
-                        <option value="Schule">Schule (kostenlos)</option>
-                        <option value="Veranstaltung">Öffentliche Veranstaltung / Event (ggf. kostenpflichtig)</option>
-                        <option value="Unternehmen">Unternehmen</option>
-                        <option value="Sonstiges">Sonstiges</option>
-                    </select>
-                </label>
-                <label>Vorname
-                    <input name="contact_first_name" required autocomplete="given-name">
-                </label>
-                <label>Nachname
-                    <input name="contact_last_name" required autocomplete="family-name">
-                </label>
-                <label>E-Mail
-                    <input type="email" name="contact_email" required autocomplete="email">
-                </label>
-                <label>Telefon
-                    <input type="tel" name="contact_phone" required autocomplete="tel">
-                </label>
-                <label>Funktion
-                    <input name="contact_role" required placeholder="z. B. Lehrkraft oder Veranstaltungsleitung">
-                </label>
-                <label>Website der Institution / Organisation <small>(optional)</small>
-                    <input type="url" name="institution_website" inputmode="url" autocomplete="url" placeholder="https://…">
-                </label>
-                <label class="pov-span-2">Straße
-                    <input name="street" required autocomplete="address-line1">
-                </label>
-                <label>Hausnummer
-                    <input name="house_number" required autocomplete="address-line2">
-                </label>
-                <label>Ort
-                    <input name="city" required autocomplete="address-level2">
-                </label>
-                <label>Postleitzahl
-                    <input name="postal_code" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code">
-                </label>
-                <label>Bundesland
-                    <select name="state_code" required autocomplete="address-level1">
-                        <option value="">Bitte auswählen</option>
-                        <?php foreach ($activeStates as $state) : ?>
-                            <option value="<?php echo esc_attr($state['state_code']); ?>"><?php echo esc_html($state['state_name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-            </div>
+            <section class="pov-form-group" aria-labelledby="pov-contact-heading">
+                <h2 id="pov-contact-heading">Kontakt</h2>
+                <div class="pov-grid-2">
+                    <label>Einrichtung oder Veranstalter
+                        <input name="institution_name" required autocomplete="organization" placeholder="z. B. Meerblick-Schule oder Stadtfest">
+                    </label>
+                    <label>Veranstaltungsart
+                        <select name="institution_type" required>
+                            <option value="">Bitte auswählen</option>
+                            <option value="Schule">Schule (kostenlos)</option>
+                            <option value="Veranstaltung">Öffentliche Veranstaltung / Event (ggf. kostenpflichtig)</option>
+                            <option value="Unternehmen">Unternehmen</option>
+                            <option value="Sonstiges">Sonstiges</option>
+                        </select>
+                    </label>
+                    <label>Vorname
+                        <input name="contact_first_name" required autocomplete="given-name">
+                    </label>
+                    <label>Nachname
+                        <input name="contact_last_name" required autocomplete="family-name">
+                    </label>
+                    <label>E-Mail
+                        <input type="email" name="contact_email" required autocomplete="email">
+                    </label>
+                    <label>Telefon
+                        <input type="tel" name="contact_phone" required autocomplete="tel">
+                    </label>
+                    <label>Funktion
+                        <input name="contact_role" required placeholder="z. B. Lehrkraft oder Veranstaltungsleitung">
+                    </label>
+                    <label>Website der Institution / Organisation <small>(optional)</small>
+                        <input type="url" name="institution_website" inputmode="url" autocomplete="url" placeholder="https://…">
+                    </label>
+                </div>
+            </section>
+            <section class="pov-form-group" aria-labelledby="pov-location-heading">
+                <h2 id="pov-location-heading">Einsatzadresse</h2>
+                <div class="pov-grid-2">
+                    <label class="pov-span-2">Straße
+                        <input name="street" required autocomplete="address-line1">
+                    </label>
+                    <label>Hausnummer
+                        <input name="house_number" required autocomplete="address-line2">
+                    </label>
+                    <label>Ort
+                        <input name="city" required autocomplete="address-level2">
+                    </label>
+                    <label>Postleitzahl
+                        <input name="postal_code" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code">
+                    </label>
+                    <label>Bundesland
+                        <select name="state_code" required autocomplete="address-level1">
+                            <option value="">Bitte auswählen</option>
+                            <?php foreach ($activeStates as $state) : ?>
+                                <option value="<?php echo esc_attr($state['state_code']); ?>"><?php echo esc_html($state['state_name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                </div>
+            </section>
 
             <section class="pov-type-section" data-event-section="Schule" hidden>
                 <h2>Schule</h2>
@@ -192,14 +214,17 @@ $schoolGrades = \ProOceanVan\Domain\SchoolClasses::configuredGrades();
                     </fieldset>
                 </template>
                 <label>Besondere Anforderungen <textarea name="school_needs" maxlength="5000"></textarea></label>
-                <label>Kann eure Schule oder euer Förderverein den Besuch finanziell unterstützen? <small>(freiwillig)</small>
-                    <select name="school_support"><option value="">Keine Angabe</option><option value="yes">Ja</option><option value="no">Nein</option></select>
-                </label>
-                <div class="pov-grid-2" data-role="school-support-details" hidden>
-                    <label>Betrag pro Klasse in Euro (unverbindlich)<input type="number" name="school_support_amount" min="0" max="100000" step="0.01" disabled></label>
-                    <label>Kommentar <input name="school_support_note" maxlength="500" disabled></label>
-                </div>
-                <p><small><em>Finanzielle Unterstützung ist keine Voraussetzung für einen Schulbesuch, hilft uns jedoch, das Bildungsangebot langfristig aufrechtzuerhalten und möglichst vielen Schulen zugänglich zu machen.</em></small></p>
+                <fieldset class="pov-school-support">
+                    <legend>Freiwillige Unterstützung</legend>
+                    <label>Kann eure Schule oder euer Förderverein den Besuch finanziell unterstützen?
+                        <select name="school_support" aria-describedby="pov-support-note"><option value="">Keine Angabe</option><option value="yes">Ja</option><option value="no">Nein</option></select>
+                    </label>
+                    <div class="pov-grid-2" data-role="school-support-details" hidden>
+                        <label>Betrag je Klasse in Euro (unverbindlich)<input type="number" name="school_support_amount" min="0" max="100000" step="0.01" disabled></label>
+                        <label>Kommentar <input name="school_support_note" maxlength="500" disabled></label>
+                    </div>
+                    <p id="pov-support-note">Euer Besuch ist kostenlos. Freiwillige Beiträge helfen, das Angebot für viele Schulen zu erhalten.</p>
+                </fieldset>
             </section>
 
             <section class="pov-type-section" data-event-section="Veranstaltung" hidden>
@@ -301,48 +326,51 @@ $schoolGrades = \ProOceanVan\Domain\SchoolClasses::configuredGrades();
                 </fieldset>
             </section>
 
-            <div class="pov-questions">
-                <?php
-                $questions = [
-                    'water_available' => 'Wasser oder Waschbecken',
-                    'natural_water_nearby' => 'Fluss oder See in Laufnähe',
-                    'wifi_available' => 'WLAN',
-                ];
-                foreach ($questions as $name => $label) :
-                    ?>
+            <section class="pov-detail-block">
+                <h2>Ausstattung vor Ort</h2>
+                <div class="pov-questions">
+                    <?php
+                    $questions = [
+                        'water_available' => 'Wasser oder Waschbecken',
+                        'natural_water_nearby' => 'Fluss oder See in Laufnähe',
+                        'wifi_available' => 'WLAN',
+                    ];
+                    foreach ($questions as $name => $label) :
+                        ?>
+                        <fieldset class="pov-choice-fieldset pov-question">
+                            <legend><?php echo esc_html($label); ?></legend>
+                            <div>
+                                <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="yes"><span>Ja</span></label>
+                                <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="no"><span>Nein</span></label>
+                            </div>
+                        </fieldset>
+                    <?php endforeach; ?>
+                    <label class="pov-question pov-natural-water-link" data-natural-water-location hidden>Google-Maps-Link zu Fluss oder See <small>(optional)</small>
+                        <input type="url" name="natural_water_location" placeholder="https://maps.google.com/…">
+                    </label>
+                    <fieldset class="pov-question pov-power-question" data-venue-section="outdoor" hidden>
+                        <legend>Stromanschluss im Außenbereich</legend>
+                        <div class="pov-power-fields">
+                            <label>Wo befindet sich der Anschluss?
+                                <input name="electricity_outdoor_location" maxlength="500" placeholder="z. B. Außensteckdose am Nebengebäude">
+                            </label>
+                            <label>Benötigte Kabellänge (Meter)
+                                <input type="number" min="0" max="5000" step="1" inputmode="numeric" name="electricity_outdoor_distance_m" placeholder="z. B. 15">
+                            </label>
+                        </div>
+                        <small>Beide Angaben sind optional und helfen bei der Vorbereitung des Außeneinsatzes.</small>
+                    </fieldset>
                     <fieldset class="pov-choice-fieldset pov-question">
-                        <legend><?php echo esc_html($label); ?></legend>
+                        <legend>Strom zum Laden der Technik
+                            <span class="pov-info-tip" tabindex="0" aria-label="Hinweis zum Stromanschluss">i<span role="tooltip">Für Laptop, VR-Technik, Wechselakkus und weitere Geräte.</span></span>
+                        </legend>
                         <div>
-                            <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="yes"><span>Ja</span></label>
-                            <label><input type="radio" name="<?php echo esc_attr($name); ?>" value="no"><span>Nein</span></label>
+                            <label><input type="radio" name="electricity_charging_available" value="yes"><span>Ja</span></label>
+                            <label><input type="radio" name="electricity_charging_available" value="no"><span>Nein</span></label>
                         </div>
                     </fieldset>
-                <?php endforeach; ?>
-                <label class="pov-question pov-natural-water-link" data-natural-water-location hidden>Google-Maps-Link zu Fluss oder See <small>(optional)</small>
-                    <input type="url" name="natural_water_location" placeholder="https://maps.google.com/…">
-                </label>
-                <fieldset class="pov-question pov-power-question" data-venue-section="outdoor" hidden>
-                    <legend>Stromanschluss im Außenbereich</legend>
-                    <div class="pov-power-fields">
-                        <label>Wo befindet sich der Anschluss?
-                            <input name="electricity_outdoor_location" maxlength="500" placeholder="z. B. Außensteckdose am Nebengebäude">
-                        </label>
-                        <label>Benötigte Kabellänge (Meter)
-                            <input type="number" min="0" max="5000" step="1" inputmode="numeric" name="electricity_outdoor_distance_m" placeholder="z. B. 15">
-                        </label>
-                    </div>
-                    <small>Beide Angaben sind optional und helfen bei der Vorbereitung des Außeneinsatzes.</small>
-                </fieldset>
-                <fieldset class="pov-choice-fieldset pov-question">
-                    <legend>Strom zum Laden der Technik
-                        <span class="pov-info-tip" tabindex="0" aria-label="Hinweis zum Stromanschluss">i<span role="tooltip">Für Laptop, VR-Technik, Wechselakkus und weitere Geräte.</span></span>
-                    </legend>
-                    <div>
-                        <label><input type="radio" name="electricity_charging_available" value="yes"><span>Ja</span></label>
-                        <label><input type="radio" name="electricity_charging_available" value="no"><span>Nein</span></label>
-                    </div>
-                </fieldset>
-            </div>
+                </div>
+            </section>
 
             <section class="pov-detail-block pov-parking-block">
                 <h2>Van-Stellplatz</h2>

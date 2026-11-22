@@ -98,7 +98,8 @@
           year: 'numeric'
         }).format(new Date(`${date}T12:00:00`));
         const recommended = this.recommended.has(date) ? ', Routenfavorit' : '';
-        const inSelection = this.selectionStart && date >= this.selectionStart && date <= this.selectionEnd;
+        const inSelection = (row.is_selectable || row.is_requestable)
+          && this.selectionStart && date >= this.selectionStart && date <= this.selectionEnd;
         let selection = '';
         if (inSelection && this.selectionStart === this.selectionEnd) selection = 'single';
         else if (inSelection && date === this.selectionStart) selection = 'start';

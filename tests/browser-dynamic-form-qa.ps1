@@ -142,7 +142,6 @@ Invoke-BrowserExpression -Expression @'
     const recommendation = document.querySelector('.pov-suggestion.is-best button');
     if (!recommendation) throw new Error('Kein Routenvorschlag für die Test-PLZ');
     recommendation.click();
-    document.querySelector('[data-action="confirm-date"]').click();
     return true;
 })()
 '@ | Out-Null
