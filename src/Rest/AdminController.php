@@ -12,6 +12,7 @@ use ProOceanVan\Repository\CalendarDayRepository;
 use ProOceanVan\Repository\RequestRepository;
 use ProOceanVan\Repository\SuggestionRepository;
 use ProOceanVan\Security\Capabilities;
+use ProOceanVan\Service\AppointmentScheduleService;
 use ProOceanVan\Service\InternalSuggestionService;
 use ProOceanVan\Service\MailService;
 use ProOceanVan\Service\WeeklyClusterService;
@@ -118,20 +119,25 @@ final class AdminController
         }
         $date = sanitize_text_field((string) $request->get_param('date'));
         $city = sanitize_text_field((string) $request->get_param('public_city'));
-        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $city === '') {
-            return new WP_Error('pov_validation', 'Datum und öffentliche Stadt sind erforderlich.', ['status' => 422]);
+        $result = (new AppointmentScheduleService())->confirm($id, [
+            'schedule_mode' => $request->get_param('schedule_mode') ?? 'days',
+            'dates' => $request->get_param('dates') ?? [$date],
+            'date_from' => $request->get_param('date_from'),
+            'date_to' => $request->get_param('date_to'),
+            'override_request_dates' => $request->get_param('override_request_dates'),
+        ], $city, sanitize_textarea_field((string) $request->get_param('internal_notes')));
+        if (empty($result['appointments'])) {
+            if (($result['notice'] ?? '') === 'schedule-invalid') {
+                return new WP_Error('pov_validation', 'Bitte gültige Einsatztage oder einen Zeitraum angeben.', ['status' => 422]);
+            }
+            return new WP_Error('pov_conflict', 'Die Einsatztage konnten nicht bestätigt werden.', [
+                'status' => 409,
+                'reason' => $result['notice'] ?? '',
+                'date' => $result['date'] ?? '',
+            ]);
         }
-        if (! $this->dateAllowedForRequest($date, $item)
-            || (int) (new \DateTimeImmutable($date))->format('N') >= 6
-            || (new CalendarDayRepository())->isBlocked($date)) {
-            return new WP_Error('pov_conflict', 'Der Termin liegt außerhalb der Anfrage oder ist nicht mehr verfügbar.', ['status' => 409]);
-        }
-        $appointmentId = (new AppointmentRepository())->createFromRequest($item, $date, $city, [], (string) $request->get_param('internal_notes'));
-        if ($appointmentId <= 0) {
-            return new WP_Error('pov_conflict', 'An diesem Tag existiert bereits ein bestätigter Termin.', ['status' => 409]);
-        }
-        (new RequestRepository())->updateStatus($id, RequestStatus::CONFIRMED, WorkState::ACCEPTED, ['confirmed_at' => current_time('mysql')]);
-        return ['ok' => true, 'appointment_id' => $appointmentId];
+        $ids = array_map('intval', array_column($result['appointments'], 'id'));
+        return ['ok' => true, 'appointment_id' => $ids[0], 'appointment_ids' => $ids];
     }
 
     public function weeks(): array

@@ -250,6 +250,13 @@
 .pov-response-date { display: grid; gap: 8px; padding: 12px; background: #f7faf9; border-radius: 10px; }
 .pov-response-date[hidden] { display: none; }
 .pov-response-date-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pov-schedule-fields, [data-pov-schedule-rows], .pov-appointment-days { display: grid; gap: 10px; }
+.pov-schedule-fields > .button { justify-self: start; }
+.pov-admin .pov-schedule-override { display: flex; gap: 8px; align-items: center; }
+.pov-schedule-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.pov-appointment-day { border: 1px solid #c8d9e2; border-radius: 10px; padding: 10px 12px; }
+.pov-appointment-day > summary { cursor: pointer; font-weight: 600; }
+.pov-appointment-day > form { margin-top: 12px; }
 .pov-response-form textarea { min-height: 120px; }
 .pov-privacy-panel > summary { color: var(--pov-dark); cursor: pointer; font-family: "Coolvetica", "Quicksand", sans-serif; font-size: 15px; }
 

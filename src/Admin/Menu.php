@@ -22,6 +22,8 @@ use ProOceanVan\Repository\SuggestionRepository;
 use ProOceanVan\Repository\TourExpenseRepository;
 use ProOceanVan\Routing\ProviderFactory;
 use ProOceanVan\Security\Capabilities;
+use ProOceanVan\Service\AppointmentDates;
+use ProOceanVan\Service\AppointmentScheduleService;
 use ProOceanVan\Service\IcsService;
 use ProOceanVan\Service\AttachmentService;
 use ProOceanVan\Service\GermanDateFormatter;
@@ -40,6 +42,7 @@ final class Menu
 
     public function register(): void
     {
+        add_action('admin_post_pov_save_appointment_day', [$this, 'saveAppointmentDay']);
         add_action('admin_menu', [$this, 'menus']);
         add_action('admin_enqueue_scripts', [$this, 'assets']);
         add_action('admin_page_access_denied', [$this, 'redirectLegacyAdmin']);
@@ -145,9 +148,10 @@ final class Menu
         $distance = is_numeric($request['route_distance_km'] ?? null) ? number_format((float) $request['route_distance_km'], 0, ',', '.') . ' km' : 'Noch offen';
         $cost = is_numeric($request['route_cost'] ?? null) ? number_format((float) $request['route_cost'], 2, ',', '.') . ' €' : 'Noch offen';
         $bestSuggestions = array_slice($suggestions, 0, 2);
-        $appointment = (new AppointmentRepository())->findForRequest($id);
-        $displayDate = $appointment && (string) ($appointment['status'] ?? '') === 'confirmed'
-            ? 'Bestätigt: ' . GermanDateFormatter::full((string) $appointment['appointment_date'])
+        $appointments = (new AppointmentRepository())->forRequest($id);
+        $activeAppointments = array_values(array_filter($appointments, static fn (array $row): bool => $row['status'] === 'confirmed'));
+        $displayDate = $activeAppointments
+            ? 'Bestätigt: ' . AppointmentDates::label(array_column($activeAppointments, 'appointment_date'))
             : $this->requestDateLabel($request);
 
         $this->header('Anfrage ' . $request['public_uuid']);
@@ -177,21 +181,24 @@ final class Menu
         }
         echo '</section>';
 
+        if ($appointments) {
+            echo $this->appointmentDaysPanel($id, $appointments);
+        }
         if (current_user_can(Capabilities::SEND_RESPONSES)) {
-            echo '<section class="pov-admin-panel pov-response-panel"><div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Kommunikation</span><h2>Nachricht senden</h2></div></div>' . $this->responseForm($request, $bestSuggestions, $appointment) . '</section>';
+            echo '<section class="pov-admin-panel pov-response-panel"><div class="pov-panel-heading"><div><span class="pov-admin-eyebrow">Kommunikation</span><h2>Nachricht senden</h2></div></div>' . $this->responseForm($request, $bestSuggestions, $activeAppointments) . '</section>';
         }
         echo $this->communicationHub($request);
         echo '</main><aside>';
 
         if (current_user_can(Capabilities::MANAGE_REQUESTS)) {
-            echo $this->requestEditor($request, $appointment);
+            echo $this->requestEditor($request);
         }
         echo $this->addressPanel($request);
 
         $breakdownKnown = (int) ($request['children_count'] ?? 0) + (int) ($request['adult_count'] ?? 0) > 0;
         echo $this->requestPlanningPanel($request, $breakdownKnown);
-        if ($appointment && (string) ($appointment['status'] ?? '') === 'confirmed') {
-            echo $this->appointmentOutcomePanel($appointment);
+        foreach ($activeAppointments as $appointment) {
+            echo $this->appointmentOutcomePanel($appointment, count($activeAppointments) > 1);
         }
 
         if (current_user_can(Capabilities::MANAGE_REQUESTS)) {
@@ -224,13 +231,15 @@ final class Menu
             (new CalendarDayRepository())->forRange($monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')),
             static fn (array $row): bool => (string) ($row['availability_state'] ?? '') === 'walk_in'
         ));
-        $publicRequestIds = array_values(array_filter(array_map(
-            static fn (array $event): int => (int) ($event['request_id'] ?? 0),
-            $publicEvents
-        )));
+        $publicStops = [];
+        foreach ($publicEvents as $event) {
+            if (! empty($event['request_id'])) {
+                $publicStops[$event['request_id'] . ':' . $event['calendar_date']] = true;
+            }
+        }
         $exportAppointments = array_values(array_filter(
             $appointments,
-            static fn (array $appointment): bool => ! in_array((int) ($appointment['request_id'] ?? 0), $publicRequestIds, true)
+            static fn (array $appointment): bool => ! isset($publicStops[$appointment['request_id'] . ':' . $appointment['appointment_date']])
         ));
 
         $this->header('Kalender');
@@ -806,26 +815,35 @@ final class Menu
     {
         $this->guard('pov_confirm_request', Capabilities::MANAGE_REQUESTS);
         $id = (int) ($_POST['request_id'] ?? 0);
-        $request = (new RequestRepository())->find($id);
-        if ($request) {
-            $date = sanitize_text_field((string) ($_POST['appointment_date'] ?? ''));
-            if (! $this->dateAllowedForRequest($date, $request)
-                || (new CalendarDayRepository())->isBlocked($date)) {
-                $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'date-outside-request']);
-            }
-            $created = (new AppointmentRepository())->createFromRequest(
-                $request,
-                $date,
-                sanitize_text_field((string) ($_POST['public_city'] ?? '')),
-                ['distance_km' => is_numeric($_POST['route_distance_km'] ?? null) ? (float) $_POST['route_distance_km'] : null, 'cost' => is_numeric($_POST['route_cost'] ?? null) ? (float) $_POST['route_cost'] : null],
-                (string) ($_POST['internal_notes'] ?? '')
-            );
-            if ($created > 0) {
-                (new RequestRepository())->updateStatus($id, RequestStatus::CONFIRMED, WorkState::ACCEPTED, ['confirmed_at' => current_time('mysql')]);
-                $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'confirmed']);
-            }
+        $input = (array) wp_unslash($_POST);
+        $result = (new AppointmentScheduleService())->confirm(
+            $id, $input, sanitize_text_field((string) ($input['public_city'] ?? '')),
+            sanitize_textarea_field((string) ($input['internal_notes'] ?? ''))
+        );
+        $this->redirectScheduleResult($id, $result, 'confirmed');
+    }
+
+    public function saveAppointmentDay(): void
+    {
+        $this->guard('pov_save_appointment_day', Capabilities::MANAGE_REQUESTS);
+        $id = (int) ($_POST['request_id'] ?? 0);
+        $result = (new AppointmentScheduleService())->changeDay(
+            $id,
+            (int) ($_POST['appointment_id'] ?? 0),
+            sanitize_key((string) ($_POST['appointment_change'] ?? '')),
+            sanitize_text_field((string) ($_POST['appointment_date'] ?? '')),
+            sanitize_textarea_field((string) wp_unslash($_POST['cancellation_reason'] ?? ''))
+        );
+        $this->redirectScheduleResult($id, $result, 'appointment-day-saved');
+    }
+
+    private function redirectScheduleResult(int $requestId, array $result, string $success): never
+    {
+        $params = ['request_id' => $requestId, 'pov_notice' => $result['notice'] ?? $success];
+        if (isset($result['date'])) {
+            $params['pov_conflict_date'] = $result['date'];
         }
-        $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'confirm-failed']);
+        $this->redirect('pov-requests', $params);
     }
 
     public function sendResponse(): void
@@ -847,71 +865,38 @@ final class Menu
             $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'response-invalid']);
         }
 
-        $date = '';
-        $appointments = null;
-        $activeAppointment = null;
-        $acceptanceRetry = $type === 'accept' && $workState === WorkState::ACCEPTED;
-        if ($type === 'accept') {
-            $appointments = new AppointmentRepository();
-            $existingAppointment = $appointments->findForRequest($id);
-            $activeAppointment = $existingAppointment && (string) ($existingAppointment['status'] ?? '') === 'confirmed'
-                ? $existingAppointment
-                : null;
-            $date = $acceptanceRetry && $activeAppointment
-                ? (string) $activeAppointment['appointment_date']
-                : sanitize_text_field((string) ($_POST['appointment_date'] ?? ''));
-            $parsedDate = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
-            if (! $parsedDate
-                || $parsedDate->format('Y-m-d') !== $date
-                || ($acceptanceRetry && ! $activeAppointment)
-                || (! $acceptanceRetry && (
-                    ! $this->dateAllowedForRequest($date, $request)
-                    || (new CalendarDayRepository())->isBlocked($date)
-                    || $appointments->existsOnDate($date, (int) ($activeAppointment['id'] ?? 0))
-                ))) {
-                $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'date-outside-request']);
-            }
+        $dates = [];
+        $input = (array) wp_unslash($_POST);
+        if ($type === 'accept' && $workState === WorkState::ACCEPTED && ! isset($input['schedule_mode'])) {
+            $input['schedule_mode'] = 'existing';
         }
-
+        if ($type === 'accept' && ! is_email((string) $request['contact_email'])) {
+            $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'response-invalid']);
+        }
         $attachments = new AttachmentService();
         $attachmentIds = $attachments->handleUploads('attachments');
         if ($attachments->hasErrors()) {
             $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'attachment-invalid']);
         }
 
-        if ($type === 'accept' && ! $acceptanceRetry && $appointments instanceof AppointmentRepository) {
-            if ($activeAppointment && $date !== (string) $activeAppointment['appointment_date']) {
-                if (! $appointments->reschedule((int) $activeAppointment['id'], $date)) {
-                    $attachments->discard($attachmentIds);
-                    $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'confirm-failed']);
-                }
-            } elseif (! $activeAppointment) {
-                $created = $appointments->createFromRequest($request, $date, (string) $request['city'], [
-                    'start_label' => (string) get_option('pov_default_start_label', ''),
-                    'start_latitude' => is_numeric(get_option('pov_default_start_latitude')) ? (float) get_option('pov_default_start_latitude') : null,
-                    'start_longitude' => is_numeric(get_option('pov_default_start_longitude')) ? (float) get_option('pov_default_start_longitude') : null,
-                    'distance_km' => is_numeric($request['route_distance_km'] ?? null) ? (float) $request['route_distance_km'] : null,
-                    'cost' => is_numeric($request['route_cost'] ?? null) ? (float) $request['route_cost'] : null,
-                ]);
-                if ($created <= 0) {
-                    $attachments->discard($attachmentIds);
-                    $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'confirm-failed']);
-                }
-            }
-        }
-
         if ($type === 'accept') {
-            $requestRepository->updateStatus($id, RequestStatus::CONFIRMED, WorkState::ACCEPTED, ['confirmed_at' => current_time('mysql')]);
+            $result = (new AppointmentScheduleService())->confirm($id, $input);
+            if (isset($result['notice'])) {
+                $attachments->discard($attachmentIds);
+                $this->redirectScheduleResult($id, $result, 'confirmed');
+            }
+            $dates = array_column($result['appointments'], 'appointment_date');
         }
         if (! (new MailService())->sendResponse(
             $request,
             $type,
             $message,
-            $date,
+            $dates,
             sanitize_text_field((string) ($_POST['subject'] ?? '')),
             $attachmentIds
         )) {
-            $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'response-failed']);
+            $notice = $type === 'accept' ? 'schedule-mail-failed' : 'response-failed';
+            $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => $notice]);
         }
 
         if ($type === 'question') {
@@ -968,8 +953,10 @@ final class Menu
         $cancel = ! empty($_POST['cancel_appointment']);
         $reactivate = ! empty($_POST['reactivate_appointment']);
         $date = sanitize_text_field((string) ($_POST['appointment_date'] ?? ''));
+        $legacyDayEdit = isset($_POST['appointment_date']) || $cancel || $reactivate;
         $appointmentConfirmed = $appointment && (string) ($appointment['status'] ?? '') === 'confirmed';
         $shouldReschedule = $appointment
+            && $legacyDayEdit
             && ! $cancel
             && ($appointmentConfirmed || $reactivate)
             && ($date !== (string) ($appointment['appointment_date'] ?? '') || ! $appointmentConfirmed);
@@ -999,6 +986,9 @@ final class Menu
             $shouldReschedule,
             $date
         ): array {
+            if (($cancel || $shouldReschedule) && count($appointments->forRequest($id)) !== 1) {
+                return ['notice' => 'schedule-invalid'];
+            }
             if ($shouldReschedule
                 && ((new CalendarDayRepository())->isBlocked($date)
                     || $appointments->existsOnDate($date, (int) $appointment['id']))) {
@@ -1018,8 +1008,8 @@ final class Menu
             }
 
             $change = 'Anfragedaten aktualisiert.';
+            $appointments->syncAddressFromRequest($updated);
             if ($appointment) {
-                $appointments->syncAddressFromRequest($updated);
                 if ($cancel) {
                     $reason = sanitize_textarea_field((string) wp_unslash($_POST['cancellation_reason'] ?? ''));
                     if (! $appointments->cancel((int) $appointment['id'], $reason)) {
@@ -1058,7 +1048,7 @@ final class Menu
             : '';
         $result = $lockDate !== ''
             ? $appointments->withPlanningLocks($id, $lockDate, $persist)
-            : $persist();
+            : $appointments->withRequestLock($id, $persist);
         if (! is_array($result)) {
             $this->redirect('pov-requests', ['request_id' => $id, 'pov_notice' => 'appointment-conflict']);
         }
@@ -1630,18 +1620,14 @@ final class Menu
         echo '</div>';
     }
 
-    private function responseForm(array $request, array $suggestions, ?array $appointment = null): string
+    private function responseForm(array $request, array $suggestions, array $appointments = []): string
     {
-        $accepted = (string) ($request['work_state'] ?? '') === WorkState::ACCEPTED;
-        $value = $accepted && $appointment && (string) ($appointment['status'] ?? '') === 'confirmed'
-            ? (string) ($appointment['appointment_date'] ?? '')
-            : (string) ($suggestions[0]['suggestion_date'] ?? $request['specific_requested_date'] ?? $request['desired_date_from'] ?? '');
-        $min = ($request['request_mode'] ?? '') === 'specific_date'
-            ? (string) ($request['specific_requested_date'] ?? '')
-            : (string) ($request['desired_date_from'] ?? '');
-        $max = ($request['request_mode'] ?? '') === 'specific_date'
-            ? (string) ($request['specific_requested_date'] ?? '')
-            : (string) ($request['desired_date_to'] ?? '');
+        $accepted = (string) ($request['work_state'] ?? '') === WorkState::ACCEPTED && (bool) $appointments;
+        $value = (string) ($suggestions[0]['suggestion_date'] ?? $request['specific_requested_date'] ?? $request['desired_date_from'] ?? '');
+        $specificDate = (string) ($request['specific_requested_date'] ?? '');
+        $today = current_time('Y-m-d');
+        $min = max($today, $specificDate ?: (string) ($request['desired_date_from'] ?? ''));
+        $max = $specificDate ?: (string) ($request['desired_date_to'] ?? '');
         $templates = [
             'accept' => $this->responseTemplate('accept', $request),
             'question' => $this->responseTemplate('question', $request),
@@ -1656,7 +1642,7 @@ final class Menu
         $choices = $closed
             ? ['message' => 'Nachricht']
             : ($accepted
-                ? ['accept' => 'Zusage erneut senden', 'teacher' => 'Info Lehrkräfte', 'parents' => 'Info Eltern', 'followup' => 'Nachbereitung', 'message' => 'Nachricht']
+                ? ['accept' => 'Zusage', 'teacher' => 'Info Lehrkräfte', 'parents' => 'Info Eltern', 'followup' => 'Nachbereitung', 'message' => 'Nachricht']
                 : ['accept' => 'Zusage', 'question' => 'Rückfrage', 'reject' => 'Absage', 'message' => 'Nachricht']);
 
         ob_start();
@@ -1668,12 +1654,19 @@ final class Menu
             echo '<label><input type="radio" name="response_type" value="' . esc_attr($type) . '" ' . checked($defaultType, $type, false) . '><span>' . esc_html($label) . '</span></label>';
         }
         echo '</fieldset>';
-        echo '<div class="pov-response-date" data-pov-response-date>';
+        echo '<div class="pov-response-date" data-pov-response-date data-today="' . esc_attr($today) . '" data-request-min="' . esc_attr($min) . '" data-request-max="' . esc_attr($max) . '"' . ($closed ? ' hidden' : '') . '>';
         if ($accepted) {
-            echo '<span>Termin <strong>' . esc_html(GermanDateFormatter::full($value)) . '</strong></span><input type="hidden" name="appointment_date" value="' . esc_attr($value) . '">';
-        } else {
-            echo '<label>Termin <input type="date" name="appointment_date" value="' . esc_attr($value) . '" min="' . esc_attr($min) . '" max="' . esc_attr($max) . '" required></label>';
+            $days = array_map([GermanDateFormatter::class, 'short'], array_column($appointments, 'appointment_date'));
+            echo '<p>Bestätigt: <strong>' . esc_html(implode(', ', $days)) . '</strong></p>';
         }
+        echo '<label>Einsatztage <select name="schedule_mode" data-pov-schedule-mode>';
+        if ($accepted) {
+            echo '<option value="existing">Zusage für bestätigte Tage erneut senden</option>';
+        }
+        echo '<option value="days">' . ($accepted ? 'Weitere einzelne Tage' : 'Einzelne Tage') . '</option><option value="range">' . ($accepted ? 'Weiteren Zeitraum hinzufügen' : 'Zusammenhängender Zeitraum') . '</option></select></label>';
+        $bounds = ' min="' . esc_attr($min) . '"' . ($max !== '' ? ' max="' . esc_attr($max) . '"' : '');
+        echo '<div class="pov-schedule-fields" data-pov-schedule-days' . ($accepted ? ' hidden' : '') . '><div data-pov-schedule-rows><div class="pov-schedule-row"><label>Datum <input type="date" name="dates[]" value="' . esc_attr($accepted ? '' : $value) . '"' . $bounds . '></label></div></div>';
+        echo '<button type="button" class="button" data-pov-add-day>Weiteren Tag hinzufügen</button><template data-pov-day-template><div class="pov-schedule-row"><label>Datum <input type="date" name="dates[]"' . $bounds . '></label><button type="button" class="button" data-pov-remove-day aria-label="Diesen Tag aus der Auswahl entfernen">Entfernen</button></div></template>';
         if ($suggestions && ! $accepted) {
             echo '<div class="pov-response-date-picks">';
             foreach ($suggestions as $suggestion) {
@@ -1682,6 +1675,8 @@ final class Menu
             }
             echo '</div>';
         }
+        echo '</div><div class="pov-schedule-fields" data-pov-schedule-range hidden><div class="pov-admin-two"><label>Von <input type="date" name="date_from"' . $bounds . '></label><label>Bis <input type="date" name="date_to"' . $bounds . '></label></div><small>Von und bis zählen mit. Jeder Tag im Zeitraum muss anfragbar sein.</small></div>';
+        echo '<label class="pov-schedule-override"><input type="checkbox" name="override_request_dates" value="1"> Abgesprochen: vom Terminwunsch abweichen</label>';
         echo '</div>';
         echo '<label>Betreff <input name="subject" value="' . esc_attr('Ocean Van · ' . (string) $request['public_uuid']) . '" required></label>';
         echo '<label>Nachricht <textarea name="message" required>' . esc_textarea($templates[$defaultType]) . '</textarea></label>';
@@ -1811,10 +1806,9 @@ final class Menu
         return (string) ob_get_clean();
     }
 
-    private function requestEditor(array $request, ?array $appointment): string
+    private function requestEditor(array $request): string
     {
         $targetGroup = (string) ($request['classes'][0]['class_name'] ?? '');
-        $actualDate = $appointment ? (string) ($appointment['appointment_date'] ?? '') : '';
         $institutionType = (string) ($request['institution_type'] ?? '');
         $institutionTypes = ['Schule' => 'Schule', 'Veranstaltung' => 'Öffentliche Veranstaltung / Event', 'Unternehmen' => 'Unternehmen', 'Sonstiges' => 'Sonstiges'];
         $classDetails = isset($request['classes'][0]['children']) ? $request['classes'] : [];
@@ -1834,16 +1828,9 @@ final class Menu
         $presentationEquipment = array_fill_keys(array_filter(explode(',', (string) ($request['presentation_equipment'] ?? ''))), true);
         $laptopConnections = array_fill_keys(array_filter(explode(',', (string) ($request['laptop_connections'] ?? ''))), true);
         ob_start();
-        echo '<details id="pov-request-editor" class="pov-admin-panel pov-request-editor"><summary>Anfrage und Termin ändern</summary><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
+        echo '<details id="pov-request-editor" class="pov-admin-panel pov-request-editor"><summary>Anfragedaten bearbeiten</summary><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
         wp_nonce_field('pov_save_request_details');
         echo '<input type="hidden" name="action" value="pov_save_request_details"><input type="hidden" name="request_id" value="' . esc_attr((string) $request['id']) . '">';
-        if ($appointment) {
-            $confirmed = (string) ($appointment['status'] ?? '') === 'confirmed';
-            echo '<label>' . ($confirmed ? 'Bestätigter Termin' : 'Stornierter Termin') . ' <input type="date" name="appointment_date" value="' . esc_attr($actualDate) . '"></label>';
-            if (! $confirmed) {
-                echo '<label><input type="checkbox" name="reactivate_appointment" value="1"> Termin mit diesem Datum reaktivieren</label>';
-            }
-        }
         echo '<label>Terminwunsch <select name="request_mode">' . $this->options(['specific_date' => 'Fester Tag', 'date_range' => 'Zeitraum'], (string) $request['request_mode']) . '</select></label>';
         echo '<label>Fester Tag <input type="date" name="specific_requested_date" value="' . esc_attr((string) ($request['specific_requested_date'] ?? '')) . '"></label>';
         echo '<div class="pov-admin-two"><label>Zeitraum von <input type="date" name="desired_date_from" value="' . esc_attr((string) ($request['desired_date_from'] ?? '')) . '"></label><label>bis <input type="date" name="desired_date_to" value="' . esc_attr((string) ($request['desired_date_to'] ?? '')) . '"></label></div>';
@@ -1899,24 +1886,59 @@ final class Menu
             echo '<label><input type="checkbox" name="laptop_connections[]" value="' . esc_attr($value) . '" ' . checked(isset($laptopConnections[$value]), true, false) . '> ' . esc_html($label) . '</label>';
         }
         echo '</div><label>Sonstiger Laptop-Anschluss <input name="laptop_connection_other" value="' . esc_attr((string) ($request['laptop_connection_other'] ?? '')) . '"></label></fieldset></fieldset>';
-        if ($appointment && (string) ($appointment['status'] ?? '') === 'confirmed') {
-            echo '<label class="pov-danger-option"><input type="checkbox" name="cancel_appointment" value="1"> Termin stornieren</label><label>Grund der Stornierung <textarea name="cancellation_reason"></textarea></label>';
-        }
         echo '<button class="button button-primary">Änderungen speichern</button></form></details>';
         return (string) ob_get_clean();
     }
 
-    private function appointmentOutcomePanel(array $appointment): string
+    private function appointmentDaysPanel(int $requestId, array $appointments): string
+    {
+        ob_start();
+        echo '<section class="pov-admin-panel"><h2>Einsatztage</h2><div class="pov-appointment-days">';
+        $canEdit = current_user_can(Capabilities::MANAGE_REQUESTS);
+        foreach ($appointments as $appointment) {
+            $date = (string) $appointment['appointment_date'];
+            $active = $appointment['status'] === 'confirmed';
+            $label = GermanDateFormatter::full($date) . ' · ' . ($active ? 'Bestätigt' : 'Abgesagt');
+            if (! $canEdit) {
+                echo '<p>' . esc_html($label) . '</p>';
+                continue;
+            }
+            echo '<details class="pov-appointment-day"><summary>' . esc_html($label) . '</summary>';
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
+            wp_nonce_field('pov_save_appointment_day');
+            echo '<input type="hidden" name="action" value="pov_save_appointment_day"><input type="hidden" name="request_id" value="' . esc_attr((string) $requestId) . '"><input type="hidden" name="appointment_id" value="' . esc_attr((string) $appointment['id']) . '">';
+            if (! $active && ! empty($appointment['cancellation_reason'])) {
+                echo '<p>' . esc_html((string) $appointment['cancellation_reason']) . '</p>';
+            }
+            echo '<label>' . ($active ? 'Neues Datum' : 'Datum zur Reaktivierung') . ' <input type="date" name="appointment_date" value="' . esc_attr($date) . '" required></label>';
+            echo '<button class="button" name="appointment_change" value="' . ($active ? 'move' : 'restore') . '">' . ($active ? 'Datum speichern' : 'Reaktivieren') . '</button>';
+            if ($active) {
+                echo '<label>Absagegrund (optional) <input type="text" name="cancellation_reason"></label><button class="button button-link-delete" name="appointment_change" value="cancel" formnovalidate>Tag absagen</button>';
+            }
+            echo '</form></details>';
+        }
+        echo '</div>';
+        if ($canEdit) {
+            echo '<p class="pov-admin-muted">Änderungen werden im Verlauf gespeichert. Informiert die Einrichtung bei Bedarf über „Nachricht senden“.</p>';
+        }
+        echo '</section>';
+        return (string) ob_get_clean();
+    }
+
+    private function appointmentOutcomePanel(array $appointment, bool $compact = false): string
     {
         $recorded = $appointment['participants_children'] !== null || $appointment['participants_adults'] !== null;
         ob_start();
-        echo '<section class="pov-admin-panel"><span class="pov-admin-eyebrow">Statistik</span><h2>Einsatzdaten</h2><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
+        echo $compact
+            ? '<details class="pov-admin-panel pov-appointment-day"><summary>Einsatzdaten · ' . esc_html(GermanDateFormatter::full((string) $appointment['appointment_date'])) . '</summary>'
+            : '<section class="pov-admin-panel"><span class="pov-admin-eyebrow">Statistik</span><h2>Einsatzdaten</h2>';
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" class="pov-admin-form">';
         wp_nonce_field('pov_save_appointment_outcome');
         echo '<input type="hidden" name="action" value="pov_save_appointment_outcome"><input type="hidden" name="appointment_id" value="' . esc_attr((string) $appointment['id']) . '"><input type="hidden" name="request_id" value="' . esc_attr((string) $appointment['request_id']) . '">';
         echo '<label>Veranstaltungsart <select name="event_type">' . $this->options(EventType::labels(), (string) $appointment['event_type']) . '</select></label>';
         echo '<div class="pov-admin-two"><label>Erreichte Kinder <input type="number" min="0" name="participants_children" value="' . esc_attr($recorded ? (string) ($appointment['participants_children'] ?? 0) : '') . '"></label>';
         echo '<label>Erreichte Erwachsene <input type="number" min="0" name="participants_adults" value="' . esc_attr($recorded ? (string) ($appointment['participants_adults'] ?? 0) : '') . '"></label></div>';
-        echo '<button class="button">Einsatzdaten speichern</button></form></section>';
+        echo '<button class="button">Einsatzdaten speichern</button></form>' . ($compact ? '</details>' : '</section>');
         return (string) ob_get_clean();
     }
 
@@ -2406,10 +2428,15 @@ final class Menu
             'proposal-sent' => ['success', 'Terminvorschläge versendet.'],
             'proposal-unavailable' => ['warning', 'Bitte zuerst mindestens einen verfügbaren Termin auswählen.'],
             'proposal-failed' => ['error', 'Die E-Mail konnte nicht gesendet werden.'],
-            'confirmed' => ['success', 'Termin bestätigt.'],
-            'confirm-failed' => ['error', 'Der Termin konnte nicht bestätigt werden.'],
+            'confirmed' => ['success', 'Einsatztage bestätigt.'],
+            'confirm-failed' => ['error', 'Die Einsatztage konnten nicht gespeichert werden.'],
+            'schedule-invalid' => ['error', 'Bitte wählt gültige Einsatztage oder einen Zeitraum von höchstens 180 Tagen.'],
+            'schedule-conflict' => ['error', 'Die Auswahl wurde nicht gespeichert: Ein Tag ist belegt, gesperrt oder liegt außerhalb des Terminwunschs.'],
+            'schedule-already-confirmed' => ['warning', 'Diese Tage sind bereits bestätigt. Zum erneuten Versand bitte „Zusage für bestätigte Tage erneut senden“ wählen.'],
+            'schedule-mail-failed' => ['warning', 'Die Einsatztage sind bestätigt. Die E-Mail konnte nicht gesendet werden und kann erneut versendet werden.'],
+            'appointment-day-saved' => ['success', 'Einsatztag aktualisiert.'],
             'date-outside-request' => ['error', 'Der Termin liegt außerhalb des angefragten Zeitraums oder ist gesperrt.'],
-            'response-accept' => ['success', 'Zusage gesendet und Termin eingetragen.'],
+            'response-accept' => ['success', 'Zusage gesendet. Die Einsatztage stehen im Kalender.'],
             'response-question' => ['success', 'Rückfrage gesendet.'],
             'response-reject' => ['success', 'Absage gesendet.'],
             'response-message' => ['success', 'Nachricht gesendet.'],
@@ -2421,7 +2448,7 @@ final class Menu
             'communication-saved' => ['success', 'Rückmeldung im Kommunikationsverlauf gespeichert.'],
             'communication-invalid' => ['error', 'Die Rückmeldung konnte nicht gespeichert werden.'],
             'attachment-invalid' => ['error', 'Dateien konnten nicht verarbeitet werden. Maximal fünf Dateien mit jeweils höchstens 10 MB.'],
-            'details-saved' => ['success', 'Anfrage und Termin aktualisiert.'],
+            'details-saved' => ['success', 'Anfragedaten aktualisiert.'],
             'details-invalid' => ['error', 'Bitte die geänderten Anfragedaten prüfen.'],
             'appointment-conflict' => ['error', 'Der neue Termin ist belegt, gesperrt oder ungültig.'],
             'outcome-saved' => ['success', 'Einsatzdaten gespeichert.'],
@@ -2446,6 +2473,10 @@ final class Menu
         ];
         if (isset($messages[$notice]) && ! isset($_GET['pov_saved_days'])) {
             [$type, $message] = $messages[$notice];
+            $conflict = AppointmentDates::parse($_GET['pov_conflict_date'] ?? null);
+            if ($notice === 'schedule-conflict' && $conflict) {
+                $message .= ' Betroffen: ' . GermanDateFormatter::full($conflict->format('Y-m-d')) . '.';
+            }
             echo '<div class="notice notice-' . esc_attr($type) . ' inline"><p>' . esc_html($message) . '</p></div>';
         }
 

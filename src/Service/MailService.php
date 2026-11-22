@@ -89,7 +89,7 @@ final class MailService
         array $request,
         string $type,
         string $message,
-        string $date = '',
+        string|array $date = '',
         string $subject = '',
         array $attachmentIds = []
     ): bool
@@ -98,7 +98,9 @@ final class MailService
             return false;
         }
 
-        $dateLabel = $date !== '' ? GermanDateFormatter::full($date) : '';
+        $dates = array_values(array_unique(array_filter(is_array($date) ? $date : [$date], [AppointmentDates::class, 'parse'])));
+        sort($dates, SORT_STRING);
+        $dateLabel = AppointmentDates::label($dates);
         $subjects = [
             'accept' => 'Zusage für den Ocean Van' . ($dateLabel !== '' ? ' · ' . $dateLabel : ''),
             'question' => 'Rückfrage zu deiner Ocean-Van-Anfrage',
@@ -115,7 +117,14 @@ final class MailService
         ];
         if ($type === 'accept' && $dateLabel !== '') {
             $lines[] = '';
-            $lines[] = 'Termin: ' . $dateLabel;
+            if (count($dates) === 1) {
+                $lines[] = 'Termin: ' . $dateLabel;
+            } else {
+                $lines[] = 'Einsatztage (' . $dateLabel . '):';
+                foreach ($dates as $day) {
+                    $lines[] = '– ' . GermanDateFormatter::full($day);
+                }
+            }
             $lines[] = 'Ort: ' . (string) $request['postal_code'] . ' ' . (string) $request['city'];
         }
         $lines[] = '';

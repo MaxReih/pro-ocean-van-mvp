@@ -200,7 +200,7 @@ final class RequestRepository
         ];
     }
 
-    public function updateStatus(int $id, string $mainStatus, string $workState, array $extra = []): void
+    public function updateStatus(int $id, string $mainStatus, string $workState, array $extra = []): bool
     {
         global $wpdb;
         $table = $wpdb->prefix . 'pov_requests';
@@ -209,7 +209,7 @@ final class RequestRepository
             'work_state' => $workState,
             'updated_at' => current_time('mysql'),
         ], $extra);
-        $wpdb->update($table, $data, ['id' => $id]);
+        return $wpdb->update($table, $data, ['id' => $id]) !== false;
     }
 
     public function updateMailAttempt(int $id, bool $sent, string $error = ''): void
@@ -392,6 +392,7 @@ final class RequestRepository
             'classes' => (new ClassRepository())->forRequest($id),
             'suggestions' => (new SuggestionRepository())->forRequest($id),
             'appointment' => (new AppointmentRepository())->findForRequest($id),
+            'appointments' => (new AppointmentRepository())->forRequest($id),
             'communications' => (new CommunicationRepository())->forRequest($id),
             'tour_expenses' => (new TourExpenseRepository())->forRequest($id),
         ];

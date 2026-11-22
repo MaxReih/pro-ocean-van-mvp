@@ -102,17 +102,47 @@
 
   function bindResponseForm(form) {
     const dateArea = form.querySelector('[data-pov-response-date]');
-    const dateInput = form.querySelector('[name="appointment_date"]');
+    const mode = form.querySelector('[data-pov-schedule-mode]');
+    const days = form.querySelector('[data-pov-schedule-days]');
+    const rows = form.querySelector('[data-pov-schedule-rows]');
+    const range = form.querySelector('[data-pov-schedule-range]');
+    const start = range?.querySelector('[name="date_from"]');
+    const end = range?.querySelector('[name="date_to"]');
+    const addDay = form.querySelector('[data-pov-add-day]');
+    const dayTemplate = form.querySelector('[data-pov-day-template]');
+    const override = form.querySelector('[name="override_request_dates"]');
     const choices = form.querySelectorAll('[name="response_type"]');
     const message = form.querySelector('[name="message"]');
-    if (!dateArea || !dateInput || !choices.length) return;
+    if (!dateArea || !mode || !days || !rows || !start || !end || !choices.length) return;
     let automaticMessage = message ? message.value : '';
 
     const update = () => {
       const selected = form.querySelector('[name="response_type"]:checked');
-      const accepts = selected && selected.value === 'accept';
+      const accepts = selected?.value === 'accept';
       dateArea.hidden = !accepts;
-      dateInput.required = Boolean(accepts);
+      mode.disabled = !accepts;
+      days.hidden = !accepts || mode.value !== 'days';
+      range.hidden = !accepts || mode.value !== 'range';
+      if (override) {
+        override.disabled = days.hidden && range.hidden;
+        override.closest('label').hidden = override.disabled;
+      }
+      const setBounds = (input) => {
+        input.min = override?.checked ? dateArea.dataset.today : dateArea.dataset.requestMin;
+        input.max = override?.checked ? '' : dateArea.dataset.requestMax;
+      };
+      rows.querySelectorAll('input').forEach((input) => {
+        setBounds(input);
+        input.disabled = days.hidden;
+        input.required = !days.hidden;
+      });
+      [start, end].forEach((input) => {
+        setBounds(input);
+        input.disabled = range.hidden;
+        input.required = !range.hidden;
+      });
+      if (start.value > end.min) end.min = start.value;
+      if (addDay) addDay.disabled = rows.children.length >= 180;
       if (selected && message) {
         const template = form.dataset[`template${selected.value.charAt(0).toUpperCase()}${selected.value.slice(1)}`] || '';
         if (!message.value.trim() || message.value === automaticMessage) {
@@ -123,8 +153,25 @@
     };
 
     choices.forEach((choice) => choice.addEventListener('change', update));
+    mode.addEventListener('change', update);
+    override?.addEventListener('change', update);
+    start.addEventListener('change', update);
+    addDay?.addEventListener('click', () => {
+      if (!dayTemplate || rows.children.length >= 180) return;
+      rows.append(dayTemplate.content.cloneNode(true));
+      update();
+      rows.lastElementChild.querySelector('input').focus();
+    });
+    rows.addEventListener('click', (event) => {
+      const remove = event.target.closest('[data-pov-remove-day]');
+      if (!remove) return;
+      remove.closest('.pov-schedule-row').remove();
+      update();
+      addDay?.focus();
+    });
     form.querySelectorAll('[data-pov-response-date-value]').forEach((button) => {
       button.addEventListener('click', () => {
+        const dateInput = rows.querySelector('input');
         dateInput.value = button.dataset.povResponseDateValue || '';
         dateInput.focus();
       });

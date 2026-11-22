@@ -66,6 +66,20 @@ final class AppointmentRepository
         return $row ?: null;
     }
 
+    public function forRequest(int $requestId, bool $confirmedOnly = false): array
+    {
+        if ($requestId <= 0) {
+            return [];
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'pov_appointments';
+        $filter = $confirmedOnly ? " AND status = 'confirmed'" : '';
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$table} WHERE request_id = %d{$filter} ORDER BY appointment_date ASC, id ASC",
+            $requestId
+        ), ARRAY_A) ?: [];
+    }
+
     public function existsOnDate(string $date, int $excludeAppointmentId = 0): bool
     {
         global $wpdb;
@@ -117,19 +131,13 @@ final class AppointmentRepository
             'route_cost' => is_numeric($request['route_cost'] ?? null) ? (float) $request['route_cost'] : null,
             'updated_at' => current_time('mysql'),
         ];
-        $outcomeRecorded = (int) $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$table}
-             WHERE request_id = %d
-               AND (metrics_recorded_at IS NOT NULL OR participants_children IS NOT NULL OR participants_adults IS NOT NULL)",
-            $requestId
-        )) > 0;
-        if (! $outcomeRecorded) {
-            $data['event_type'] = EventType::normalize((string) ($request['institution_type'] ?? ''));
-        }
         $wpdb->update($table, $data, ['request_id' => $requestId]);
+        $wpdb->update($table, ['event_type' => EventType::normalize((string) ($request['institution_type'] ?? ''))], [
+            'request_id' => $requestId, 'metrics_recorded_at' => null, 'participants_children' => null, 'participants_adults' => null,
+        ]);
     }
 
-    public function createFromRequest(array $request, string $date, string $publicCity, array $route = [], string $notes = ''): int
+    public function createFromRequest(array $request, string $date, string $publicCity, array $route = [], string $notes = '', bool $allowAdditional = false): int
     {
         $requestId = (int) ($request['id'] ?? 0);
         if ($requestId <= 0 || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || ! $this->acquireRequestLock($requestId)) {
@@ -142,7 +150,7 @@ final class AppointmentRepository
             if (! $dateLocked) {
                 return 0;
             }
-            if ($this->existsForRequest($requestId) || $this->existsOnDate($date)) {
+            if ((! $allowAdditional && $this->existsForRequest($requestId)) || $this->existsOnDate($date)) {
                 return 0;
             }
             global $wpdb;
@@ -199,7 +207,6 @@ final class AppointmentRepository
         try {
             $dateLocked = $this->acquireDateLock($date);
             if (! $dateLocked
-                || $this->existsForRequest($requestId, $id)
                 || $this->existsOnDate($date, $id)) {
                 return false;
             }
@@ -222,18 +229,28 @@ final class AppointmentRepository
 
     public function withPlanningLocks(int $requestId, string $date, callable $callback): mixed
     {
-        if ($requestId <= 0
-            || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
-            || ! $this->acquireRequestLock($requestId)) {
+        return $this->withScheduleLocks($requestId, [$date], $callback);
+    }
+
+    public function withScheduleLocks(int $requestId, array $dates, callable $callback): mixed
+    {
+        if ($requestId <= 0 || ! $this->acquireRequestLock($requestId)) {
             return null;
         }
 
-        $dateLocked = false;
+        $dates = array_unique($dates);
+        sort($dates, SORT_STRING);
+        $locked = [];
         try {
-            $dateLocked = $this->acquireDateLock($date);
-            return $dateLocked ? $callback() : null;
+            foreach ($dates as $date) {
+                if (! is_string($date) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || ! $this->acquireDateLock($date)) {
+                    return null;
+                }
+                $locked[] = $date;
+            }
+            return $callback();
         } finally {
-            if ($dateLocked) {
+            foreach (array_reverse($locked) as $date) {
                 $this->releaseDateLock($date);
             }
             $this->releaseRequestLock($requestId);
